@@ -29,6 +29,8 @@ ID3D11ShaderResourceView*           g_pTextureSun = NULL;
 RenderTextureClass					RenderToTexture;
 RenderTextureClass					Voxel_GI;
 RenderTextureClass					Oct_GI;
+RenderTextureClass					VFL;
+RenderTextureClass					cunt;
 RenderTextureClass					ShadowToTexture;
 RenderTextureClass					VLToTexture;
 RenderTextureClass					BrightToTexture;
@@ -612,9 +614,9 @@ HRESULT InitDevice()
 	if (FAILED(hr))
 		return hr;
 
-	// Compute shader NNEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW 
+	// Compute shader
 	pPSBlob = NULL;
-	hr = CompileShaderFromFile(L"compute.fx", "cs", "cs_5_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"compute.fx", "CS", "cs_5_0", &pPSBlob);
 	if(FAILED(hr))
 		{
 		MessageBox(NULL,
@@ -852,6 +854,8 @@ HRESULT InitDevice()
 	RenderToTexture.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, TRUE);
 	Voxel_GI.Initialize_3DTex(g_pd3dDevice, 512, 512, 512, TRUE, DXGI_FORMAT_R8G8B8A8_UNORM, TRUE);
 	Oct_GI.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
+	VFL.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32G32B32A32_FLOAT, TRUE);
+	cunt.Initialize_1DTex(g_pd3dDevice, g_hWnd, 1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
 	ShadowToTexture.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
 	VLToTexture.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
 	BrightToTexture.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
@@ -1868,20 +1872,22 @@ void Render_to_3dtexture(long elapsed)
 void Render_to_3dtexture(long elapsed)
 {
 	ID3D11RenderTargetView*			RenderTarget = RenderToTexture.GetRenderTarget();
-	ID3D11UnorderedAccessView *uav[2] = { NULL, NULL };
+	ID3D11UnorderedAccessView *uav[3] = { NULL, NULL, NULL };
 	
 	//uav[0] = Voxel_GI.GetUAV();
 	uav[0] = Oct_GI.GetUAV();
+	uav[1] = VFL.GetUAV();
+	uav[2] = cunt.GetUAV();
 	float ClearColorRT[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red, green, blue, alpha
-	//float ClearColorUAV[4] = { 0,0,0,0 }; // red, green, blue, alpha
+	float ClearColorUAV[4] = { 0,0,0,0 }; // red, green, blue, alpha
 	unsigned int ClearColorUAVint[1] = { 0 }; // red
 
 	// Clear render target, UAV & shaders, set render target & primitive topology
 	g_pImmediateContext->ClearRenderTargetView(RenderTarget, ClearColorRT);
-	//g_pImmediateContext->ClearUnorderedAccessViewFloat(uav[0], ClearColorUAV);
+	g_pImmediateContext->ClearUnorderedAccessViewFloat(uav[1], ClearColorUAV);
 	g_pImmediateContext->ClearUnorderedAccessViewUint(uav[0], ClearColorUAVint);
 	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0, 0);
-	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RenderTarget, 0, 1, 1, uav, 0);
+	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RenderTarget, 0, 1, 2, uav, 0);
 	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
 	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
 	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
@@ -2209,7 +2215,7 @@ void run_compute_shader(long elapsed)
 	//				SET YOUR READ/WRITE STUFF:
 	/*
 	int initCounts = 0;
-	ID3D11UnorderedAccessView *uav = Voxel_list.GetUAV(); //Voxel_list can be a texture class object and set to uav, you now the drill...
+	ID3D11UnorderedAccessView *uav = Voxel_list.GetUAV(); //Voxel_list can be a texture class object and set to uav, you know the drill...
 	g_pImmediateContext->CSSetUnorderedAccessViews(0, 1, uav, &initCounts);
 	ID3D11ShaderResourceView* srv[3];
 	srv[0] = .. set here some texture aka input stuff, in this example I set 3 textures, can be more, can be less
@@ -2232,7 +2238,12 @@ void run_compute_shader(long elapsed)
 	g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBuffer);
 
 	// RUNNNNNNN!!!!!!!!!
-	g_pImmediateContext->Dispatch(1, 1, 1);
+	g_pImmediateContext->Dispatch(256, 1, 1);
+
+	// make a second compute shader
+	// run both of them in a loop as many times as octree levels
+	// ???
+	// success
 
 	Reset_CS();
 }
@@ -2244,10 +2255,10 @@ void Render()
 	stopwatch.start(); //restart
 
 	cam.animation(elapsed);
-	//Render_to_3dtexture(elapsed);
-	Render_to_test(elapsed);
-	//Render_to_texture(elapsed);
-	Render_to_texture_test(elapsed);
+	Render_to_3dtexture(elapsed);
+	//Render_to_test(elapsed);
+	Render_to_texture(elapsed);
+	//Render_to_texture_test(elapsed);
 	Render_to_texture2(elapsed);
 
 	run_compute_shader(elapsed);	//could be anywhere in the render pipeline //NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW 
