@@ -15,16 +15,14 @@ Texture2D txVL : register(t4);
 Texture2D txBloom : register(t5);
 
 //RWTexture3D<float4> Voxel_GI : register(u1);
-RWTexture1D<unsigned int> Oct_GI : register(u1);
+RWTexture1D<unsigned int> Octree_RW : register(u1);
 RWTexture1D<float4> VFL : register(u2);
 RWTexture1D<unsigned int> cunt : register(u3);
 
 Texture3D Voxels_SR : register(t3);
-Texture1D<unsigned int> Oct_SR : register(t6);
+Texture1D<unsigned int> Octree_SR : register(t6);
 
 SamplerState samLinear : register(s0);
-
-
 
 
 cbuffer ConstantBuffer : register(b0)
@@ -95,9 +93,9 @@ uint put_in_octree(float3 pos) {
 	float3 midpt = float3(0, 0, 0);
 	float midsize = vxarea / 4.;
 	uint idx = 0;
-	if (Oct_GI[0] == 0)
-		InterlockedExchange(Oct_GI[0], 9, temp); 
-		//Oct_GI[0] = 9;
+	if (Octree_RW[0] == 0)
+		InterlockedExchange(Octree_RW[0], 9, temp); 
+		//Octree_RW[0] = 9;
 	
 
 	while (level != maxlevel) {
@@ -124,22 +122,22 @@ uint put_in_octree(float3 pos) {
 
 		currdex = octdex + idx;
 		if (level + 1 != maxlevel) {
-			if (Oct_GI[currdex] > 1) {
-				//InterlockedAdd(Oct_GI[currdex], 0, octdex);
-				octdex = Oct_GI[currdex];
+			if (Octree_RW[currdex] > 1) {
+				//InterlockedAdd(Octree_RW[currdex], 0, octdex);
+				octdex = Octree_RW[currdex];
 			}
 			else {
-				//InterlockedAdd(Oct_GI[0], 8, octdex);
+				//InterlockedAdd(Octree_RW[0], 8, octdex);
 				//octdex += 1;
-				octdex = Oct_GI[0];
-				Oct_GI[0] += 8;
-				Oct_GI[currdex] = octdex;
-				//InterlockedExchange(Oct_GI[currdex], octdex, temp);
+				octdex = Octree_RW[0];
+				Octree_RW[0] += 8;
+				Octree_RW[currdex] = octdex;
+				//InterlockedExchange(Octree_RW[currdex], octdex, temp);
 			}
 		}
 		else
-			//InterlockedExchange(Oct_GI[currdex],1, temp);
-			Oct_GI[currdex] = 1;
+			//InterlockedExchange(Octree_RW[currdex],1, temp);
+			Octree_RW[currdex] = 1;
 
 		if (idx % 2 == 0) midpt.x -= midsize;
 		else midpt.x += midsize; 
@@ -187,8 +185,8 @@ uint put_in_octree(float3 pos) {
 			}
 		}
 		
-		if (Oct_SR[octdex + idx] > 0)
-			octdex = Oct_SR[octdex + idx];
+		if (Octree_SR[octdex + idx] > 0)
+			octdex = Octree_SR[octdex + idx];
 		else {
 			return false;
 		}
@@ -350,24 +348,24 @@ PS_MRTOutput PS(PS_INPUT input) : SV_Target
 	
 	/////////////////////////////////////////////////////////
 
-	/*Oct_GI[1] = 1;
-	Oct_GI[2] = 0;
-	Oct_GI[3] = 1;
-	Oct_GI[4] = 1;
-	Oct_GI[5] = 1;
-	Oct_GI[6] = 1;
-	Oct_GI[7] = 1;
-	Oct_GI[8] = 1;*/
+	/*Octree_RW[1] = 1;
+	Octree_RW[2] = 0;
+	Octree_RW[3] = 1;
+	Octree_RW[4] = 1;
+	Octree_RW[5] = 1;
+	Octree_RW[6] = 1;
+	Octree_RW[7] = 1;
+	Octree_RW[8] = 1;*/
 
 
-	/*Oct_GI[1] = 9;
-	Oct_GI[14] = 17;
-	Oct_GI[22] = 25;
-	Oct_GI[30] = 33;
-	Oct_GI[38] = 41;
-	Oct_GI[46] = 49;
-	Oct_GI[54] = 57;
-	Oct_GI[62] = 1;*/
+	/*Octree_RW[1] = 9;
+	Octree_RW[14] = 17;
+	Octree_RW[22] = 25;
+	Octree_RW[30] = 33;
+	Octree_RW[38] = 41;
+	Octree_RW[46] = 49;
+	Octree_RW[54] = 57;
+	Octree_RW[62] = 1;*/
 	//put_in_octree(float3(0.1,0.1,0.1));
 	//put_in_octree(float3(-0.1, -0.1, -0.1));
 	//put_in_octree(viewpos);
@@ -377,123 +375,123 @@ PS_MRTOutput PS(PS_INPUT input) : SV_Target
 	InterlockedAdd(cunt[0], 1, idx);
 	VFL[idx] = viewpos;
 
-	/*Oct_GI[0] = 121;
-	Oct_GI[1] = 9;
-	Oct_GI[2] = 0;
-	Oct_GI[3] = 0;
-	Oct_GI[4] = 0;
-	Oct_GI[5] = 0;
-	Oct_GI[6] = 65;
-	Oct_GI[7] = 0;
-	Oct_GI[8] = 0;
-	Oct_GI[9] = 0;
-	Oct_GI[10] = 0;
-	Oct_GI[11] = 0;
-	Oct_GI[12] = 0;
-	Oct_GI[13] = 0;
-	Oct_GI[14] = 17;
-	Oct_GI[15] = 0;
-	Oct_GI[16] = 0;
-	Oct_GI[17] = 0;
-	Oct_GI[18] = 0;
-	Oct_GI[19] = 0;
-	Oct_GI[20] = 0;
-	Oct_GI[21] = 0;
-	Oct_GI[22] = 25;
-	Oct_GI[23] = 0;
-	Oct_GI[24] = 0;
-	Oct_GI[25] = 0;
-	Oct_GI[26] = 0;
-	Oct_GI[27] = 0;
-	Oct_GI[28] = 0;
-	Oct_GI[29] = 0;
-	Oct_GI[30] = 33;
-	Oct_GI[31] = 0;
-	Oct_GI[32] = 0;
-	Oct_GI[33] = 0;
-	Oct_GI[34] = 0;
-	Oct_GI[35] = 0;
-	Oct_GI[36] = 0;
-	Oct_GI[37] = 0;
-	Oct_GI[38] = 41;
-	Oct_GI[39] = 0;
-	Oct_GI[40] = 0;
-	Oct_GI[41] = 0;
-	Oct_GI[42] = 0;
-	Oct_GI[43] = 0;
-	Oct_GI[44] = 0;
-	Oct_GI[45] = 0;
-	Oct_GI[46] = 49;
-	Oct_GI[47] = 0;
-	Oct_GI[48] = 0;
-	Oct_GI[49] = 0;
-	Oct_GI[50] = 0;
-	Oct_GI[51] = 0;
-	Oct_GI[52] = 0;
-	Oct_GI[53] = 0;
-	Oct_GI[54] = 57;
-	Oct_GI[55] = 0;
-	Oct_GI[56] = 0;
-	Oct_GI[57] = 0;
-	Oct_GI[58] = 0;
-	Oct_GI[59] = 0;
-	Oct_GI[60] = 0;
-	Oct_GI[61] = 0;
-	Oct_GI[62] = 1;
-	Oct_GI[63] = 0;
-	Oct_GI[64] = 0;
-	Oct_GI[65] = 73;
-	Oct_GI[66] = 0;
-	Oct_GI[67] = 0;
-	Oct_GI[68] = 0;
-	Oct_GI[69] = 0;
-	Oct_GI[70] = 0;
-	Oct_GI[71] = 0;
-	Oct_GI[72] = 0;
-	Oct_GI[73] = 81;
-	Oct_GI[74] = 0;
-	Oct_GI[75] = 0;
-	Oct_GI[76] = 0;
-	Oct_GI[77] = 0;
-	Oct_GI[78] = 0;
-	Oct_GI[79] = 0;
-	Oct_GI[80] = 0;
-	Oct_GI[81] = 89;
-	Oct_GI[82] = 0;
-	Oct_GI[83] = 0;
-	Oct_GI[84] = 0;
-	Oct_GI[85] = 0;
-	Oct_GI[86] = 0;
-	Oct_GI[87] = 0;
-	Oct_GI[88] = 0;
-	Oct_GI[89] = 97;
-	Oct_GI[90] = 0;
-	Oct_GI[91] = 0;
-	Oct_GI[92] = 0;
-	Oct_GI[93] = 0;
-	Oct_GI[94] = 0;
-	Oct_GI[95] = 0;
-	Oct_GI[96] = 0;
-	Oct_GI[97] = 105;
-	Oct_GI[98] = 0;
-	Oct_GI[99] = 0;
-	Oct_GI[100] = 0;
-	Oct_GI[101] = 0;
-	Oct_GI[102] = 0;
-	Oct_GI[103] = 0;
-	Oct_GI[104] = 0;
-	Oct_GI[105] = 113;
-	Oct_GI[106] = 0;
-	Oct_GI[107] = 0;
-	Oct_GI[108] = 0;
-	Oct_GI[109] = 0;
-	Oct_GI[110] = 0;
-	Oct_GI[111] = 0;
-	Oct_GI[112] = 0;
-	Oct_GI[113] = 1;*/
+	/*Octree_RW[0] = 121;
+	Octree_RW[1] = 9;
+	Octree_RW[2] = 0;
+	Octree_RW[3] = 0;
+	Octree_RW[4] = 0;
+	Octree_RW[5] = 0;
+	Octree_RW[6] = 65;
+	Octree_RW[7] = 0;
+	Octree_RW[8] = 0;
+	Octree_RW[9] = 0;
+	Octree_RW[10] = 0;
+	Octree_RW[11] = 0;
+	Octree_RW[12] = 0;
+	Octree_RW[13] = 0;
+	Octree_RW[14] = 17;
+	Octree_RW[15] = 0;
+	Octree_RW[16] = 0;
+	Octree_RW[17] = 0;
+	Octree_RW[18] = 0;
+	Octree_RW[19] = 0;
+	Octree_RW[20] = 0;
+	Octree_RW[21] = 0;
+	Octree_RW[22] = 25;
+	Octree_RW[23] = 0;
+	Octree_RW[24] = 0;
+	Octree_RW[25] = 0;
+	Octree_RW[26] = 0;
+	Octree_RW[27] = 0;
+	Octree_RW[28] = 0;
+	Octree_RW[29] = 0;
+	Octree_RW[30] = 33;
+	Octree_RW[31] = 0;
+	Octree_RW[32] = 0;
+	Octree_RW[33] = 0;
+	Octree_RW[34] = 0;
+	Octree_RW[35] = 0;
+	Octree_RW[36] = 0;
+	Octree_RW[37] = 0;
+	Octree_RW[38] = 41;
+	Octree_RW[39] = 0;
+	Octree_RW[40] = 0;
+	Octree_RW[41] = 0;
+	Octree_RW[42] = 0;
+	Octree_RW[43] = 0;
+	Octree_RW[44] = 0;
+	Octree_RW[45] = 0;
+	Octree_RW[46] = 49;
+	Octree_RW[47] = 0;
+	Octree_RW[48] = 0;
+	Octree_RW[49] = 0;
+	Octree_RW[50] = 0;
+	Octree_RW[51] = 0;
+	Octree_RW[52] = 0;
+	Octree_RW[53] = 0;
+	Octree_RW[54] = 57;
+	Octree_RW[55] = 0;
+	Octree_RW[56] = 0;
+	Octree_RW[57] = 0;
+	Octree_RW[58] = 0;
+	Octree_RW[59] = 0;
+	Octree_RW[60] = 0;
+	Octree_RW[61] = 0;
+	Octree_RW[62] = 1;
+	Octree_RW[63] = 0;
+	Octree_RW[64] = 0;
+	Octree_RW[65] = 73;
+	Octree_RW[66] = 0;
+	Octree_RW[67] = 0;
+	Octree_RW[68] = 0;
+	Octree_RW[69] = 0;
+	Octree_RW[70] = 0;
+	Octree_RW[71] = 0;
+	Octree_RW[72] = 0;
+	Octree_RW[73] = 81;
+	Octree_RW[74] = 0;
+	Octree_RW[75] = 0;
+	Octree_RW[76] = 0;
+	Octree_RW[77] = 0;
+	Octree_RW[78] = 0;
+	Octree_RW[79] = 0;
+	Octree_RW[80] = 0;
+	Octree_RW[81] = 89;
+	Octree_RW[82] = 0;
+	Octree_RW[83] = 0;
+	Octree_RW[84] = 0;
+	Octree_RW[85] = 0;
+	Octree_RW[86] = 0;
+	Octree_RW[87] = 0;
+	Octree_RW[88] = 0;
+	Octree_RW[89] = 97;
+	Octree_RW[90] = 0;
+	Octree_RW[91] = 0;
+	Octree_RW[92] = 0;
+	Octree_RW[93] = 0;
+	Octree_RW[94] = 0;
+	Octree_RW[95] = 0;
+	Octree_RW[96] = 0;
+	Octree_RW[97] = 105;
+	Octree_RW[98] = 0;
+	Octree_RW[99] = 0;
+	Octree_RW[100] = 0;
+	Octree_RW[101] = 0;
+	Octree_RW[102] = 0;
+	Octree_RW[103] = 0;
+	Octree_RW[104] = 0;
+	Octree_RW[105] = 113;
+	Octree_RW[106] = 0;
+	Octree_RW[107] = 0;
+	Octree_RW[108] = 0;
+	Octree_RW[109] = 0;
+	Octree_RW[110] = 0;
+	Octree_RW[111] = 0;
+	Octree_RW[112] = 0;
+	Octree_RW[113] = 1;*/
 	/*int ii = 0;
 for (; ii <= 113; ii++)
-	Oct_GI[ii] = 0;
+	Octree_RW[ii] = 0;
 put_in_octree(float3(-.1, -.1, -.1));
 put_in_octree(float3(.1, .1, .1));*/
 	/////////////////////////////////////////////////////////

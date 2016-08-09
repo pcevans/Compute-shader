@@ -27,21 +27,21 @@ ID3D11RasterizerState*				g_pRasterState = NULL;
 ID3D11ShaderResourceView*           g_pTextureSun = NULL;
 
 RenderTextureClass					RenderToTexture;
+RenderTextureClass					LightSourcePass;
+RenderTextureClass					VolumetricPass;
+RenderTextureClass					BrightPass;
+RenderTextureClass					BloomPass;
+
 RenderTextureClass					Voxel_GI;
-RenderTextureClass					Oct_GI;
+RenderTextureClass					Octree_RW;
 RenderTextureClass					VFL;
-RenderTextureClass					cunt;
-RenderTextureClass					ShadowToTexture;
-RenderTextureClass					VLToTexture;
-RenderTextureClass					BrightToTexture;
-RenderTextureClass					BloomToTexture;
+RenderTextureClass					count;
 
-ID3D11VertexShader*                 g_pVertexShader_screen = NULL;
-ID3D11PixelShader*                  g_pPixelShader_screen = NULL;
+ID3D11VertexShader*                 g_pScreenVS = NULL;
+ID3D11PixelShader*                  g_pScreenPS = NULL;
 
-ID3D11PixelShader*                  g_pPixelShader_sky = NULL; //skybox
-ID3D11PixelShader*                  PScloud = NULL;
-
+ID3D11PixelShader*                  g_pSkyPS = NULL;
+ID3D11PixelShader*                  g_pCloudPS = NULL;
 
 ID3D11VertexShader*                 g_pVertexShader = NULL;
 ID3D11PixelShader*                  g_pPixelShader = NULL;
@@ -49,34 +49,30 @@ ID3D11PixelShader*                  g_pPixelShader = NULL;
 ID3D11VertexShader*                 g_pEffectVS = NULL;
 ID3D11PixelShader*                  g_pEffectPS = NULL;
 
-
-ID3D11ComputeShader*                ComputeShader = NULL;	//NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW 
-void run_compute_shader(long elapsed);
+ID3D11ComputeShader*                g_pOctreeCS = NULL;	//NEW
 
 ID3D11VertexShader*                 g_pShadowVS = NULL;
 ID3D11PixelShader*                  g_pShadowPS = NULL;
-ID3D11PixelShader*                  PSsun = NULL;
+ID3D11PixelShader*                  g_pSunPS = NULL;
 
-ID3D11PixelShader*                  PSbright = NULL;
-ID3D11PixelShader*                  PSbloom = NULL;
-ID3D11VertexShader*                 VSbloom = NULL;
+ID3D11PixelShader*                  g_pBrightPS = NULL;
+ID3D11VertexShader*                 g_pBloomVS = NULL;
+ID3D11PixelShader*                  g_pBloomPS = NULL;
 
-ID3D11VertexShader*                 voxelVS = NULL;
-ID3D11GeometryShader*				voxelGS = NULL;
-ID3D11PixelShader*                  voxelPS = NULL;
+ID3D11VertexShader*                 g_pVoxelVS = NULL;
+ID3D11GeometryShader*				g_pVoxelGS = NULL;
+ID3D11PixelShader*                  g_pVoxelPS = NULL;
 voxel_								voxel;
-
 
 ID3D11InputLayout*                  g_pVertexLayout = NULL;
 ID3D11Buffer*                       g_pVertexBuffer = NULL;
 ID3D11Buffer*                       g_pVertexBuffer_sky = NULL;
 ID3D11Buffer*                       g_pVertexBuffer_screen = NULL;
-int vertex_count;
+int									vertex_count;
 
 //states for turning off and on the depth buffer
 ID3D11DepthStencilState				*ds_on, *ds_off;
 ID3D11BlendState*					g_BlendState;
-
 
 ID3D11Buffer*                       g_pCBuffer = NULL;
 
@@ -85,7 +81,6 @@ ID3D11ShaderResourceView*           g_pSkyboxTex = NULL; //skybox
 ID3D11ShaderResourceView*           normaltex = NULL;
 
 ID3D11SamplerState*                 g_pSamplerLinear = NULL;
-ID3D11SamplerState*                 SamplerScreen = NULL;
 
 XMMATRIX                            g_World;
 XMMATRIX                            g_View;
@@ -100,9 +95,8 @@ billboard							sun;
 billboard							testcloud;
 billboard							testcloud2;
 int									plane = 0;
-int									Clcount = 0;
 int									voxeldraw = 0;
-int									numberOfClouds = 5;
+int									numberOfClouds = 10;
 float								offsetx = 2;
 float								offsety = 0;
 float								offsetz = 2;
@@ -152,7 +146,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 	put_in_octree(XMFLOAT3(.1, .1, .1));
 
 	for (int i = 0; i < 100000; i++) {
-		tfile << "Oct_GI[" << i << "] = " << GIarr[i] << ";\n";
+		tfile << "Octree_RW[" << i << "] = " << GIarr[i] << ";\n";
 	}
 
 	sun.position.x = 0;
@@ -381,7 +375,7 @@ HRESULT InitDevice()
 			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 	}
-	hr = g_pd3dDevice->CreateVertexShader(pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), NULL, &voxelVS);
+	hr = g_pd3dDevice->CreateVertexShader(pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), NULL, &g_pVoxelVS);
 	if (FAILED(hr))
 	{
 		pVSBlob->Release();
@@ -396,7 +390,7 @@ HRESULT InitDevice()
 			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 	}
-	hr = g_pd3dDevice->CreateGeometryShader(pGSBlob->GetBufferPointer(), pGSBlob->GetBufferSize(), NULL, &voxelGS);
+	hr = g_pd3dDevice->CreateGeometryShader(pGSBlob->GetBufferPointer(), pGSBlob->GetBufferSize(), NULL, &g_pVoxelGS);
 	pGSBlob->Release();
 	if (FAILED(hr))
 		return hr;
@@ -409,7 +403,7 @@ HRESULT InitDevice()
 			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 	}
-	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &voxelPS);
+	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pVoxelPS);
 	pPSBlob->Release();
 	if (FAILED(hr))
 		return hr;
@@ -453,7 +447,7 @@ HRESULT InitDevice()
 			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 	}
-	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &PScloud);
+	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pCloudPS);
 	pPSBlob->Release();
 	if (FAILED(hr))
 		return hr;
@@ -467,7 +461,7 @@ HRESULT InitDevice()
 			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 	}
-	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pPixelShader_sky);
+	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pSkyPS);
 	pPSBlob->Release();
 	if (FAILED(hr))
 		return hr;
@@ -481,7 +475,7 @@ HRESULT InitDevice()
 			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 	}
-	hr = g_pd3dDevice->CreateVertexShader(pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), NULL, &g_pVertexShader_screen);
+	hr = g_pd3dDevice->CreateVertexShader(pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), NULL, &g_pScreenVS);
 	if (FAILED(hr))
 	{
 		pVSBlob->Release();
@@ -497,7 +491,7 @@ HRESULT InitDevice()
 			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 	}
-	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pPixelShader_screen);
+	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pScreenPS);
 	pPSBlob->Release();
 	if (FAILED(hr))
 		return hr;
@@ -511,7 +505,7 @@ HRESULT InitDevice()
 			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 	}
-	hr = g_pd3dDevice->CreateVertexShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &VSbloom);
+	hr = g_pd3dDevice->CreateVertexShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pBloomVS);
 	pPSBlob->Release();
 	if (FAILED(hr))
 		return hr;
@@ -525,7 +519,7 @@ HRESULT InitDevice()
 			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 	}
-	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &PSbloom);
+	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pBloomPS);
 	pPSBlob->Release();
 	if (FAILED(hr))
 		return hr;
@@ -539,7 +533,7 @@ HRESULT InitDevice()
 			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 	}
-	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &PSbright);
+	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pBrightPS);
 	pPSBlob->Release();
 	if (FAILED(hr))
 		return hr;
@@ -609,7 +603,7 @@ HRESULT InitDevice()
 			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 	}
-	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &PSsun);
+	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pSunPS);
 	pPSBlob->Release();
 	if (FAILED(hr))
 		return hr;
@@ -623,7 +617,7 @@ HRESULT InitDevice()
 				   L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 		}
-	hr = g_pd3dDevice->CreateComputeShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &ComputeShader);
+	hr = g_pd3dDevice->CreateComputeShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pOctreeCS);
 	pPSBlob->Release();
 	if(FAILED(hr))
 		return hr;
@@ -766,9 +760,6 @@ HRESULT InitDevice()
 	hr = g_pd3dDevice->CreateSamplerState(&sampDesc, &g_pSamplerLinear);
 	if (FAILED(hr))
 		return hr;
-	hr = g_pd3dDevice->CreateSamplerState(&sampDesc, &SamplerScreen);
-	if (FAILED(hr))
-		return hr;
 
 	// Initialize the world matrices
 	g_World = XMMatrixIdentity();
@@ -853,13 +844,13 @@ HRESULT InitDevice()
 	// RenderTarget textures
 	RenderToTexture.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, TRUE);
 	Voxel_GI.Initialize_3DTex(g_pd3dDevice, 512, 512, 512, TRUE, DXGI_FORMAT_R8G8B8A8_UNORM, TRUE);
-	Oct_GI.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
+	Octree_RW.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
 	VFL.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32G32B32A32_FLOAT, TRUE);
-	cunt.Initialize_1DTex(g_pd3dDevice, g_hWnd, 1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
-	ShadowToTexture.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
-	VLToTexture.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
-	BrightToTexture.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
-	BloomToTexture.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
+	count.Initialize_1DTex(g_pd3dDevice, g_hWnd, 1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
+	LightSourcePass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
+	VolumetricPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
+	BrightPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
+	BloomPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
 
 	return S_OK;
 }
@@ -877,20 +868,20 @@ void CleanupDevice()
 	if (g_pVertexBuffer) g_pVertexBuffer->Release();
 	if (g_pVertexLayout) g_pVertexLayout->Release();
 	if (g_pVertexShader) g_pVertexShader->Release();
-	if (g_pVertexShader_screen) g_pVertexShader_screen->Release();
+	if (g_pScreenVS) g_pScreenVS->Release();
 	if (g_pPixelShader) g_pPixelShader->Release();
-	if (PScloud) PScloud->Release();
+	if (g_pCloudPS) g_pCloudPS->Release();
 	if (g_pEffectVS) g_pEffectVS->Release();
 	if (g_pEffectPS) g_pEffectPS->Release();
 	if (g_pShadowVS) g_pShadowVS->Release();
 	if (g_pShadowPS) g_pShadowPS->Release();
-	if (PSsun) PSsun->Release();
-	if (PSbright) PSbright->Release();
-	if (PSbloom) PSbloom->Release();
-	if (VSbloom) VSbloom->Release();
-	if (voxelVS) voxelVS->Release();
-	if (voxelGS) voxelGS->Release();
-	if (voxelPS) voxelPS->Release();
+	if (g_pSunPS) g_pSunPS->Release();
+	if (g_pBrightPS) g_pBrightPS->Release();
+	if (g_pBloomPS) g_pBloomPS->Release();
+	if (g_pBloomVS) g_pBloomVS->Release();
+	if (g_pVoxelVS) g_pVoxelVS->Release();
+	if (g_pVoxelGS) g_pVoxelGS->Release();
+	if (g_pVoxelPS) g_pVoxelPS->Release();
 	if (g_pVertexBuffer_sky) g_pVertexBuffer_sky->Release();
 	if (g_pVertexBuffer_screen) g_pVertexBuffer_screen->Release();
 	if (ds_on) ds_on->Release();
@@ -898,9 +889,8 @@ void CleanupDevice()
 	if (g_BlendState) g_BlendState->Release();
 	if (g_pSkyboxTex) g_pSkyboxTex->Release();
 	if (normaltex) normaltex->Release();
-	if (SamplerScreen) SamplerScreen->Release();
-	if (g_pPixelShader_screen) g_pPixelShader_screen->Release();
-	if (g_pPixelShader_sky) g_pPixelShader_sky->Release();
+	if (g_pScreenPS) g_pScreenPS->Release();
+	if (g_pSkyPS) g_pSkyPS->Release();
 	if (g_pDepthStencil) g_pDepthStencil->Release();
 	if (g_pDepthStencilView) g_pDepthStencilView->Release();
 	if (g_pRenderTargetView) g_pRenderTargetView->Release();
@@ -962,8 +952,8 @@ void OnMM(HWND hwnd, int x, int y, UINT keyFlags)
 	}
 	int diffx = holdx - x;
 	int diffy = holdy - y;
-	float angle_y = (float)diffx / 300.0;
-	float angle_x = (float)diffy / 300.0;
+	float angle_y = (float)diffx / 300.0f;
+	float angle_x = (float)diffy / 300.0f;
 	cam.rotation.x += angle_x;
 	cam.rotation.y += angle_y;
 
@@ -1041,7 +1031,6 @@ void OnKeyDown(HWND hwnd, UINT vk, BOOL fDown, int cRepeat, UINT flags)
 	case 69: cam.e = 1; //s
 		break;
 	case 27: 
-		int breakpoint = 1;
 		PostQuitMessage(0);//escape
 		break;
 	}
@@ -1213,8 +1202,8 @@ void Render_to_texture(long elapsed)
 
 	// Sky sphere day and night cycle
 	static float f = 0.1;
-	f = f + 0.0001;
-	f += elapsed / 10000000.0;
+	f = f + 0.0001f;
+	f += elapsed / 10000000.0f;
 	constantbuffer.DayTimer.x = cos(f);
 
 	// Render skybox
@@ -1229,7 +1218,7 @@ void Render_to_texture(long elapsed)
 	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
 	
-	g_pImmediateContext->PSSetShader(g_pPixelShader_sky, NULL, 0);
+	g_pImmediateContext->PSSetShader(g_pSkyPS, NULL, 0);
 	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
 	g_pImmediateContext->PSSetShaderResources(2, 1, &g_pSkyboxTex);
 	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
@@ -1244,12 +1233,12 @@ void Render_to_texture(long elapsed)
 
 	ID3D11ShaderResourceView* d3dtexture = Voxel_GI.GetShaderResourceView();
 	g_pImmediateContext->GenerateMips(d3dtexture);
-	ID3D11ShaderResourceView* octexture = Oct_GI.GetShaderResourceView();
+	ID3D11ShaderResourceView* octexture = Octree_RW.GetShaderResourceView();
 
 	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
 	
-	g_pImmediateContext->PSSetShader(PScloud, NULL, 0);
+	g_pImmediateContext->PSSetShader(g_pCloudPS, NULL, 0);
 	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureRV);
 	g_pImmediateContext->PSSetShaderResources(3, 1, &d3dtexture);
 	g_pImmediateContext->PSSetShaderResources(6, 1, &octexture);
@@ -1279,19 +1268,19 @@ void Render_to_texture(long elapsed)
 		constantbuffer.info.x = 1;
 		g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
 
-		g_pImmediateContext->VSSetShader(voxelVS, NULL, 0);
+		g_pImmediateContext->VSSetShader(g_pVoxelVS, NULL, 0);
 		g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->VSSetSamplers(0, 1, &SamplerScreen);
+		g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
 
-		g_pImmediateContext->GSSetShader(voxelGS, NULL, 0);
+		g_pImmediateContext->GSSetShader(g_pVoxelGS, NULL, 0);
 		g_pImmediateContext->GSSetShaderResources(0, 1, &d3dtexture);
 		g_pImmediateContext->GSSetShaderResources(1, 1, &octexture);
 		g_pImmediateContext->GSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->GSSetSamplers(0, 1, &SamplerScreen);
+		g_pImmediateContext->GSSetSamplers(0, 1, &g_pSamplerLinear);
 
-		g_pImmediateContext->PSSetShader(voxelPS, NULL, 0);
+		g_pImmediateContext->PSSetShader(g_pVoxelPS, NULL, 0);
 		g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->PSSetSamplers(0, 1, &SamplerScreen);
+		g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
 
 		g_pImmediateContext->IASetVertexBuffers(0, 1, &voxel.vbuffer, &stride, &offset);
 		g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
@@ -1337,8 +1326,8 @@ void Render_to_texture_test(long elapsed)
 
 	// Sky sphere day and night cycle
 	static float f = 0.1;
-	f = f + 0.0001;
-	f += elapsed / 10000000.0;
+	f = f + 0.0001f;
+	f += elapsed / 10000000.0f;
 	constantbuffer.DayTimer.x = cos(f);
 
 	// Render skybox
@@ -1353,7 +1342,7 @@ void Render_to_texture_test(long elapsed)
 	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
 
-	g_pImmediateContext->PSSetShader(g_pPixelShader_sky, NULL, 0);
+	g_pImmediateContext->PSSetShader(g_pSkyPS, NULL, 0);
 	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
 	g_pImmediateContext->PSSetShaderResources(2, 1, &g_pSkyboxTex);
 	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
@@ -1368,12 +1357,12 @@ void Render_to_texture_test(long elapsed)
 
 	ID3D11ShaderResourceView* d3dtexture = Voxel_GI.GetShaderResourceView();
 	g_pImmediateContext->GenerateMips(d3dtexture);
-	ID3D11ShaderResourceView* octexture = Oct_GI.GetShaderResourceView();
+	ID3D11ShaderResourceView* octexture = Octree_RW.GetShaderResourceView();
 
 	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
 
-	g_pImmediateContext->PSSetShader(PScloud, NULL, 0);
+	g_pImmediateContext->PSSetShader(g_pCloudPS, NULL, 0);
 	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureRV);
 	g_pImmediateContext->PSSetShaderResources(3, 1, &d3dtexture);
 	g_pImmediateContext->PSSetShaderResources(6, 1, &octexture);
@@ -1404,19 +1393,19 @@ void Render_to_texture_test(long elapsed)
 		constantbuffer.info.x = 1;
 		g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
 
-		g_pImmediateContext->VSSetShader(voxelVS, NULL, 0);
+		g_pImmediateContext->VSSetShader(g_pVoxelVS, NULL, 0);
 		g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->VSSetSamplers(0, 1, &SamplerScreen);
+		g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
 
-		g_pImmediateContext->GSSetShader(voxelGS, NULL, 0);
+		g_pImmediateContext->GSSetShader(g_pVoxelGS, NULL, 0);
 		g_pImmediateContext->GSSetShaderResources(0, 1, &d3dtexture);
 		g_pImmediateContext->GSSetShaderResources(1, 1, &octexture);
 		g_pImmediateContext->GSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->GSSetSamplers(0, 1, &SamplerScreen);
+		g_pImmediateContext->GSSetSamplers(0, 1, &g_pSamplerLinear);
 
-		g_pImmediateContext->PSSetShader(voxelPS, NULL, 0);
+		g_pImmediateContext->PSSetShader(g_pVoxelPS, NULL, 0);
 		g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->PSSetSamplers(0, 1, &SamplerScreen);
+		g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
 
 		g_pImmediateContext->IASetVertexBuffers(0, 1, &voxel.vbuffer, &stride, &offset);
 		g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
@@ -1438,7 +1427,7 @@ void Render_to_texture2(long elapsed)
 {
 	float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // red, green, blue, alpha
 	ID3D11RenderTargetView*			RenderTarget;
-	RenderTarget = ShadowToTexture.GetRenderTarget();
+	RenderTarget = LightSourcePass.GetRenderTarget();
 
 	// Clear render target & shaders, set render target & primitive topology
 	g_pImmediateContext->ClearRenderTargetView(RenderTarget, ClearColor);
@@ -1462,13 +1451,13 @@ void Render_to_texture2(long elapsed)
 
 	// Sky sphere day and night cycle
 	static float f = 0.1;
-	f = f + 0.0001;
-	f += elapsed / 10000000.0;
+	f = f + 0.0001f;
+	f += elapsed / 10000000.0f;
 	constantbuffer.DayTimer.x = cos(f);
 
 	// Render sun
 	XMMATRIX worldmatrix = XMMatrixIdentity();
-	sun.rotation += elapsed / 5500000.0;
+	sun.rotation += elapsed / 5500000.0f;
 	worldmatrix = sun.get_matrix(view);
 	constantbuffer.World = XMMatrixTranspose(worldmatrix);
 	constantbuffer.View = XMMatrixTranspose(view);
@@ -1481,7 +1470,7 @@ void Render_to_texture2(long elapsed)
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
 	g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
 
-	g_pImmediateContext->PSSetShader(PSsun, NULL, 0);
+	g_pImmediateContext->PSSetShader(g_pSunPS, NULL, 0);
 	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureSun);
 	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
 	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
@@ -1532,18 +1521,18 @@ void Render_to_texture2(long elapsed)
 		constantbuffer.info.x = 1;
 		g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
 		
-		g_pImmediateContext->VSSetShader(voxelVS, NULL, 0);
+		g_pImmediateContext->VSSetShader(g_pVoxelVS, NULL, 0);
 		g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->VSSetSamplers(0, 1, &SamplerScreen);
+		g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
 		
-		g_pImmediateContext->GSSetShader(voxelGS, NULL, 0);
+		g_pImmediateContext->GSSetShader(g_pVoxelGS, NULL, 0);
 		g_pImmediateContext->GSSetShaderResources(5, 1, &d3dtexture);
 		g_pImmediateContext->GSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->GSSetSamplers(0, 1, &SamplerScreen);
+		g_pImmediateContext->GSSetSamplers(0, 1, &g_pSamplerLinear);
 		
-		g_pImmediateContext->PSSetShader(voxelPS, NULL, 0);
+		g_pImmediateContext->PSSetShader(g_pVoxelPS, NULL, 0);
 		g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->PSSetSamplers(0, 1, &SamplerScreen);
+		g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
 		
 		g_pImmediateContext->IASetVertexBuffers(0, 1, &voxel.vbuffer, &stride, &offset);
 		g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
@@ -1562,8 +1551,8 @@ void Render_to_texture2(long elapsed)
 void Render_to_texture3(long elapsed)
 {
 	float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // red, green, blue, alpha
-	ID3D11RenderTargetView*			RenderTarget = VLToTexture.GetRenderTarget();
-	ID3D11ShaderResourceView*		texture = ShadowToTexture.GetShaderResourceView();
+	ID3D11RenderTargetView*			RenderTarget = VolumetricPass.GetRenderTarget();
+	ID3D11ShaderResourceView*		texture = LightSourcePass.GetShaderResourceView();
 
 	// Clear render target & shaders, set render target & primitive topology
 	g_pImmediateContext->ClearRenderTargetView(RenderTarget, ClearColor);
@@ -1624,7 +1613,7 @@ void Render_to_texturebright(long elapsed)
 {
 	float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // red, green, blue, alpha
 	ID3D11RenderTargetView*			RenderTarget;
-	RenderTarget = BrightToTexture.GetRenderTarget();
+	RenderTarget = BrightPass.GetRenderTarget();
 
 	ID3D11ShaderResourceView*		texture = RenderToTexture.GetShaderResourceView();
 
@@ -1652,11 +1641,11 @@ void Render_to_texturebright(long elapsed)
 	constantbuffer.CameraPos = XMFLOAT4(cam.position.x, cam.position.y, cam.position.z, 1);
 	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0); //update constant buffer
 
-	g_pImmediateContext->VSSetShader(VSbloom, NULL, 0); //set vertex shader
+	g_pImmediateContext->VSSetShader(g_pBloomVS, NULL, 0); //set vertex shader
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer); //set constant buffer for vertex shader
 	g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
 
-	g_pImmediateContext->PSSetShader(PSbright, NULL, 0); //set pixel shader
+	g_pImmediateContext->PSSetShader(g_pBrightPS, NULL, 0); //set pixel shader
 	g_pImmediateContext->PSSetShaderResources(0, 1, &texture); //set texture resource for pixel shader
 	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
 	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear); //set sampler for pixel and vertex buffers
@@ -1677,8 +1666,8 @@ void Render_to_texturebright(long elapsed)
 void Render_to_texturebloom(long elapsed)
 {
 	float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // red, green, blue, alpha
-	ID3D11RenderTargetView*			RenderTarget = BloomToTexture.GetRenderTarget();
-	ID3D11ShaderResourceView*		texture = BrightToTexture.GetShaderResourceView();
+	ID3D11RenderTargetView*			RenderTarget = BloomPass.GetRenderTarget();
+	ID3D11ShaderResourceView*		texture = BrightPass.GetShaderResourceView();
 	ID3D11ShaderResourceView*		texture1 = RenderToTexture.GetShaderResourceView();
 
 	// Clear render target & shaders, set render target & primitive topology
@@ -1709,13 +1698,13 @@ void Render_to_texturebloom(long elapsed)
 	constantbuffer.info.y = screencam.y;
 	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0); //update constant buffer
 
-	g_pImmediateContext->VSSetShader(VSbloom, NULL, 0);			//set vertex shader
+	g_pImmediateContext->VSSetShader(g_pBloomVS, NULL, 0);			//set vertex shader
 	g_pImmediateContext->VSSetShaderResources(0, 1, &texture);		//set texture resource for vertex shader
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);	//set constant buffer for vertex shader
 	g_pImmediateContext->VSSetShaderResources(1, 1, &texture1);		//set texture resource for vertex shader
 	g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);	//set sampler for vertex shader
 
-	g_pImmediateContext->PSSetShader(PSbloom, NULL, 0);			//set pixel shader
+	g_pImmediateContext->PSSetShader(g_pBloomPS, NULL, 0);			//set pixel shader
 	g_pImmediateContext->PSSetShaderResources(0, 1, &texture);
 	g_pImmediateContext->PSSetShaderResources(1, 1, &texture1);
 	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
@@ -1875,9 +1864,9 @@ void Render_to_3dtexture(long elapsed)
 	ID3D11UnorderedAccessView *uav[3] = { NULL, NULL, NULL };
 	
 	//uav[0] = Voxel_GI.GetUAV();
-	uav[0] = Oct_GI.GetUAV();
+	uav[0] = Octree_RW.GetUAV();
 	uav[1] = VFL.GetUAV();
-	uav[2] = cunt.GetUAV();
+	uav[2] = count.GetUAV();
 	float ClearColorRT[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red, green, blue, alpha
 	float ClearColorUAV[4] = { 0,0,0,0 }; // red, green, blue, alpha
 	unsigned int ClearColorUAVint[1] = { 0 }; // red
@@ -1912,7 +1901,7 @@ void Render_to_3dtexture(long elapsed)
 	worldmatrix = XMMatrixIdentity();
 
 	if (!madeClouds) {
-		for (int i = 0; i < 10; i++)
+		for (int i = 0; i < numberOfClouds; i++)
 			MakeClouds();
 
 		madeClouds = true;
@@ -1945,7 +1934,7 @@ void Render_to_3dtexture(long elapsed)
 
 	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->VSSetSamplers(0, 1, &SamplerScreen);
+	g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
 
 	g_pImmediateContext->PSSetShader(g_pPixelShader, NULL, 0);
 	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureRV);
@@ -1988,7 +1977,7 @@ void Render_to_test(long elapsed)
 	ID3D11RenderTargetView*			RenderTarget = RenderToTexture.GetRenderTarget();
 	ID3D11UnorderedAccessView *uav[2] = { NULL, NULL };
 
-	uav[0] = Oct_GI.GetUAV();
+	uav[0] = Octree_RW.GetUAV();
 	float ClearColorRT[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red, green, blue, alpha
 														  //float ClearColorUAV[4] = { 0,0,0,0 }; // red, green, blue, alpha
 	unsigned int ClearColorUAVint[1] = { 0 }; // red
@@ -2020,7 +2009,7 @@ void Render_to_test(long elapsed)
 
 	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->VSSetSamplers(0, 1, &SamplerScreen);
+	g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
 
 	g_pImmediateContext->PSSetShader(g_pPixelShader, NULL, 0);
 	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureRV);
@@ -2077,24 +2066,24 @@ void Render_to_screen(long elapsed)
 	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	ID3D11ShaderResourceView*           texture = RenderToTexture.GetShaderResourceView();
-	ID3D11ShaderResourceView*			texture2 = VLToTexture.GetShaderResourceView();
+	ID3D11ShaderResourceView*			texture2 = VolumetricPass.GetShaderResourceView();
 	ID3D11ShaderResourceView*           vx = Voxel_GI.GetShaderResourceView();
-	ID3D11ShaderResourceView*			texture3 = BloomToTexture.GetShaderResourceView();
+	ID3D11ShaderResourceView*			texture3 = BloomPass.GetShaderResourceView();
 
 	constantbuffer.World = XMMatrixIdentity();
 	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
 
-	g_pImmediateContext->VSSetShader(g_pVertexShader_screen, NULL, 0);
+	g_pImmediateContext->VSSetShader(g_pScreenVS, NULL, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->VSSetSamplers(0, 1, &SamplerScreen);
+	g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
 
-	g_pImmediateContext->PSSetShader(g_pPixelShader_screen, NULL, 0);
+	g_pImmediateContext->PSSetShader(g_pScreenPS, NULL, 0);
 	g_pImmediateContext->PSSetShaderResources(0, 1, &texture);
 	g_pImmediateContext->PSSetShaderResources(3, 1, &vx);
 	g_pImmediateContext->PSSetShaderResources(4, 1, &texture2);
 	g_pImmediateContext->PSSetShaderResources(5, 1, &texture3);
 	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->PSSetSamplers(0, 1, &SamplerScreen);
+	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
 
 	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer_screen, &stride, &offset);
 	
@@ -2210,7 +2199,7 @@ void run_compute_shader(long elapsed)
 	g_pImmediateContext->DSSetShader(NULL, NULL, 0);
 	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
 	
-	g_pImmediateContext->CSSetShader(ComputeShader, NULL, 0);
+	g_pImmediateContext->CSSetShader(g_pOctreeCS, NULL, 0);
 
 	//				SET YOUR READ/WRITE STUFF:
 	/*

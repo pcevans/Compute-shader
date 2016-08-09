@@ -12,7 +12,7 @@ SamplerState Sampler : register(s0);
 SamplerState SamplerNone : register(s1);
 
 Texture3D Voxel_SR : register(t0);
-Texture1D<unsigned int> Oct_SR : register(t1);
+Texture1D<unsigned int> Octree_SR : register(t1);
 
 
 
@@ -102,7 +102,7 @@ float4 find_in_octree(float3 pos) {
 		}
 
 		currdex = octdex + idx;
-		uint octsr = Oct_SR[currdex];
+		uint octsr = Octree_SR[currdex];
 		if (level + 1 != maxlevel) {
 			if (octsr > 0)
 				octdex = octsr;
@@ -164,7 +164,7 @@ float4 find_in_octree(float3 pos) {
 
 
 		uint curr = 0;
-		curr = Oct_SR[octdex + idx];
+		curr = Octree_SR[octdex + idx];
 		if (curr > 0.01)
 			octdex = curr;
 		else
@@ -184,7 +184,7 @@ float4 find_in_octree(float3 pos) {
 		level += 1;
 	}
 
-	if (Oct_SR[idx] == 1)
+	if (Octree_SR[idx] == 1)
 		return float4(midpt, level);
 	else
 		return float4(midpt, 0);
@@ -246,7 +246,7 @@ float4 find_in_octree(float3 pos) {
 
 
 		uint curr = 0;
-		curr = Oct_SR[octdex + idx];
+		curr = Octree_SR[octdex + idx];
 		if (curr > 0) {
 			//return float4(idx/8, idx / 8, idx / 8, 1);
 			octdex = curr;
