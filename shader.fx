@@ -17,7 +17,7 @@ Texture2D txBloom : register(t5);
 //RWTexture3D<float4> Voxel_GI : register(u1);
 RWTexture1D<unsigned int> Octree_RW : register(u1);
 RWTexture1D<float4> VFL : register(u2);
-RWTexture1D<unsigned int> cunt : register(u3);
+RWTexture1D<unsigned int> count : register(u3);
 
 Texture3D Voxels_SR : register(t3);
 Texture1D<unsigned int> Octree_SR : register(t6);
@@ -372,7 +372,7 @@ PS_MRTOutput PS(PS_INPUT input) : SV_Target
 
 	float idx = 0;
 	
-	InterlockedAdd(cunt[0], 1, idx);
+	InterlockedAdd(count[0], 1, idx);
 	VFL[idx] = viewpos;
 
 	/*Octree_RW[0] = 121;

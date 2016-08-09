@@ -5,8 +5,6 @@ RWTexture1D<unsigned int> Octree_RW : register(u1);
 RWTexture1D<float4> VFL : register(u2);
 RWTexture1D<unsigned int> count : register(u3);
 
-//groupshared uint 
-
 cbuffer ConstantBuffer : register(b0)
 {
 	matrix World;
@@ -19,7 +17,6 @@ cbuffer ConstantBuffer : register(b0)
 };
 
 uint put_in_octree(float3 pos, uint level) {
-	//uint level = 0;
 	uint octdex = 3;
 	uint currdex = 0;
 	uint flag;
@@ -92,7 +89,7 @@ void index_octree(int curridx) {
 void CS(uint3 DTid : SV_DispatchThreadID)
 {
 	//how many passes do you need? We have DTid.x going from 0 to 511
-	int numpassesflag = ceil(count[0] / NUM_THREADS);
+	int numpassesflag = (count[0] / NUM_THREADS) + 1;
 	int currindex;
 
 	//go from 0 to VFL[0]
@@ -109,7 +106,7 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 void CS2(uint3 DTid : SV_DispatchThreadID)
 {
 	//how many passes do you need? We have DTid.x going from 0 to 511
-	int numpassesindex = ceil((Octree_RW[1] - Octree_RW[2]) / NUM_THREADS);
+	int numpassesindex = ((Octree_RW[1] - Octree_RW[2]) / NUM_THREADS) + 1;
 	int currindex;
 
 	//go from Octree_RW[1] to Octree_RW[0]
