@@ -877,8 +877,8 @@ HRESULT InitDevice()
 	RenderToTexture.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, TRUE);
 	Voxel_GI.Initialize_3DTex(g_pd3dDevice, 512, 512, 512, TRUE, DXGI_FORMAT_R8G8B8A8_UNORM, TRUE);
 	Octree_RW.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
-	VFL.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32G32B32A32_FLOAT, TRUE);
-	const_count.Initialize_1DTex(g_pd3dDevice, g_hWnd, 1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
+	VFL.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32_FLOAT, TRUE);
+	const_count.Initialize_1DTex(g_pd3dDevice, g_hWnd, 5, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
 	LightSourcePass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
 	VolumetricPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
 	BrightPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
@@ -2011,7 +2011,7 @@ void Render_to_test(long elapsed)
 	ID3D11RenderTargetView*			RenderTarget = RenderToTexture.GetRenderTarget();
 	ID3D11UnorderedAccessView *uav[2] = { NULL, NULL };
 
-	uav[0] = Octree_RW.GetUAV();
+	uav[0] = VFL.GetUAV();
 	float ClearColorRT[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red, green, blue, alpha
 														  //float ClearColorUAV[4] = { 0,0,0,0 }; // red, green, blue, alpha
 	unsigned int ClearColorUAVint[1] = { 0 }; // red
@@ -2192,25 +2192,25 @@ unsigned int put_in_octree(XMFLOAT3 pos) {
 	return currdex;
 }
 
-/////////////////////////		NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW 
+/////////////////////////		NEW NEW NEW
 void Reset_CS()
 	{
 	ID3D11UnorderedAccessView*	ppUAVssNULL[10] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 	ID3D11ShaderResourceView*	ppSRVsNULL[10] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 	ID3D11Buffer*				ppBuffsNULL[10] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 	UINT initCounts = 0;
-	int actualnum_uav = 1;//count of uav's = read/write stuff
+	int actualnum_uav = 3;//count of uav's = read/write stuff
 	int actualnum_srv = 1;//count of shader ressource view = txtures for input
 	int actualnum_buffs = 1;//count of constant buffer = what you get from the C++ side
 
-	if(actualnum_uav)	g_pImmediateContext->CSSetUnorderedAccessViews(0, actualnum_uav, ppUAVssNULL, &initCounts);
+	if(actualnum_uav)	g_pImmediateContext->CSSetUnorderedAccessViews(1, actualnum_uav, ppUAVssNULL, &initCounts);
 	if(actualnum_srv)	g_pImmediateContext->CSSetShaderResources(0, actualnum_srv, ppSRVsNULL);
 	if(actualnum_buffs)	g_pImmediateContext->CSSetConstantBuffers(0, actualnum_buffs, ppBuffsNULL);
 
 	actualnum_buffs = actualnum_uav = actualnum_srv = 0;
 	g_pImmediateContext->CSSetShader(NULL, NULL, 0);
 	}
-//------------------------------------------------------- NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW 
+//------------------------------------------------------- NEW NEW NEW
 /*
 void update_constants()
 	{
@@ -2243,6 +2243,13 @@ void run_compute_shader(long elapsed)
 
 	Reset_CS();
 
+	ID3D11UnorderedAccessView* uav[3] = { NULL, NULL, NULL };
+	uav[0] = Octree_RW.GetUAV();
+	uav[1] = VFL.GetUAV();
+	uav[2] = const_count.GetUAV();
+
+	g_pImmediateContext->CSSetUnorderedAccessViews(1, 3, uav, NULL);
+
 	
 	//I do a lot of resetting = set things to NULL, I don't know it this all is necessary!!!!!
 	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
@@ -2266,41 +2273,31 @@ void run_compute_shader(long elapsed)
 	>CSSetShaderResources(0, 3, srv);
 	*/
 
-	
 	ConstantBufferCS constantbufferCS;
 	constantbufferCS.values = XMFLOAT4(0,0,0,0);
 	g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
 	g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
-	g_pImmediateContext->CSSetShader(g_pFlaggingCS, NULL, 0);
 
 	for (int i = 0; i < maxlevel; i++)			//maxlevel = 8
 	{
+		//update your constant buffer
 		constantbufferCS.values = XMFLOAT4((float)i+EPS, 0, 0, 0);
 		g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
 		g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
 
 		//run CS(VFL, count[]);
-		{
-			//flag all the voxel nodes in the list into the Octree_RW array
-			//everytime you run: count[1] = previous index, and next index = count[2]
-		}
+		//flag all the voxel nodes in the list into the Octree_RW array
+		//everytime you run: count[1] = previous index, and next index = count[2]
+		g_pImmediateContext->CSSetShader(g_pFlaggingCS, NULL, 0);
+		g_pImmediateContext->Dispatch(256, 1, 1);
+		
 		//run CS2(Octree_RW, count[1,2]);
 		//update_constants();		//updates after CS2
 								//updates after CS2
+		g_pImmediateContext->CSSetShader(g_pBuildingCS, NULL, 0);
+		g_pImmediateContext->Dispatch(256, 1, 1);
 
-	}
-
-	//update your constant buffer
-	//note: I would do a new constant buffer from scratch including an int vvariable for the current octree level
-	ConstantBuffer constantbuffer;
-	XMMATRIX view = cam.get_matrix(&g_View);
-	constantbuffer.View = XMMatrixTranspose(view);
-	constantbuffer.Projection = XMMatrixTranspose(g_Projection);
-	constantbuffer.CameraPos = XMFLOAT4(cam.position.x, cam.position.y, cam.position.z, 1);
-	constantbuffer.World = XMMatrixIdentity();	
-	
-	// RUNNNNNNN!!!!!!!!!
-	g_pImmediateContext->Dispatch(256, 1, 1);
+	}	
 
 	Reset_CS();
 }

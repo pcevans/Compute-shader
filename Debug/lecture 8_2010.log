@@ -165,10 +165,10 @@ c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(189
 c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2009): warning C4100: 'elapsed': unreferenced formal parameter
 c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2081): warning C4100: 'elapsed': unreferenced formal parameter
 c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2187): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2278): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2284): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
 c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2232): warning C4100: 'elapsed': unreferenced formal parameter
-c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2311): warning C4244: 'initializing': conversion from 'long double' to 'long', possible loss of data
-c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2314): warning C4244: 'argument': conversion from 'long' to 'float', possible loss of data
-c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2323): warning C4244: '=': conversion from 'long double' to 'long', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2308): warning C4244: 'initializing': conversion from 'long double' to 'long', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2311): warning C4244: 'argument': conversion from 'long' to 'float', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2320): warning C4244: '=': conversion from 'long double' to 'long', possible loss of data
   lecture 8_2010.vcxproj -> C:\Users\gameprogrammer\Desktop\Compute shader\Compute shader\Debug\homework 4.exe
   lecture 8_2010.vcxproj -> C:\Users\gameprogrammer\Desktop\Compute shader\Compute shader\Debug\homework 4.pdb (Full PDB)

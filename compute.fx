@@ -96,13 +96,13 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 	[allow_uav_condition]
 	for (int i = 0; i < numpassesflag; i++)
 		{
-		uint vocel_to_work_on = DTid.x + NUM_THREADS*i;
-		if (vocel_to_work_on >= count[0])break;
+		uint voxel_to_work_on = DTid.x + NUM_THREADS*i;
+		if (voxel_to_work_on >= count[0])break;
 
 		
-		float px = VFL[vocel_to_work_on * 3 + 0];
-		float py = VFL[vocel_to_work_on * 3 + 1];
-		float pz = VFL[vocel_to_work_on * 3 + 2];
+		float px = VFL[voxel_to_work_on * 3 + 0];
+		float py = VFL[voxel_to_work_on * 3 + 1];
+		float pz = VFL[voxel_to_work_on * 3 + 2];
 		float3 pos = float3(px, py, pz);
 		[allow_uav_condition]
 		for (int level = 0; level < maxlevel; level++)
