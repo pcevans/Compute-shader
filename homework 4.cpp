@@ -35,7 +35,7 @@ RenderTextureClass					BloomPass;
 RenderTextureClass					Voxel_GI;
 RenderTextureClass					Octree_RW;
 RenderTextureClass					VFL;
-RenderTextureClass					count;
+RenderTextureClass					const_count;
 
 ID3D11VertexShader*                 g_pScreenVS = NULL;
 ID3D11PixelShader*                  g_pScreenPS = NULL;
@@ -75,6 +75,8 @@ ID3D11DepthStencilState				*ds_on, *ds_off;
 ID3D11BlendState*					g_BlendState;
 
 ID3D11Buffer*                       g_pCBuffer = NULL;
+
+ID3D11Buffer*						g_pCBufferCS = NULL;
 
 ID3D11ShaderResourceView*           g_pTextureRV = NULL;
 ID3D11ShaderResourceView*           g_pSkyboxTex = NULL; //skybox
@@ -727,6 +729,17 @@ HRESULT InitDevice()
 	if (FAILED(hr))
 		return hr;
 
+	// Create the constant buffers for the CS
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(ConstantBufferCS);
+	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bd.CPUAccessFlags = 0;
+	hr = g_pd3dDevice->CreateBuffer(&bd, NULL, &g_pCBufferCS);
+	if (FAILED(hr))
+		return hr;
+
+
+
 	// Load skybox texture
 	hr = D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice, L"skybox3.png", NULL, NULL, &g_pSkyboxTex, NULL);
 	if (FAILED(hr))
@@ -780,6 +793,10 @@ HRESULT InitDevice()
 	constantbuffer.World = XMMatrixTranspose(XMMatrixIdentity());
 	constantbuffer.info = XMFLOAT4(1, 1, 1, 1);
 	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
+
+	ConstantBufferCS constantbufferCS;
+	constantbufferCS.values = XMFLOAT4(0,0,0,0);
+	g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
 
 	// Create the blend state
 	D3D11_BLEND_DESC blendStateDesc;
@@ -846,7 +863,7 @@ HRESULT InitDevice()
 	Voxel_GI.Initialize_3DTex(g_pd3dDevice, 512, 512, 512, TRUE, DXGI_FORMAT_R8G8B8A8_UNORM, TRUE);
 	Octree_RW.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
 	VFL.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32G32B32A32_FLOAT, TRUE);
-	count.Initialize_1DTex(g_pd3dDevice, g_hWnd, 1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
+	const_count.Initialize_1DTex(g_pd3dDevice, g_hWnd, 1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
 	LightSourcePass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
 	VolumetricPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
 	BrightPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
@@ -865,6 +882,8 @@ void CleanupDevice()
 	if (g_pSamplerLinear) g_pSamplerLinear->Release();
 	if (g_pTextureRV) g_pTextureRV->Release();
 	if (g_pCBuffer) g_pCBuffer->Release();
+	if (g_pCBufferCS) g_pCBufferCS->Release();
+	
 	if (g_pVertexBuffer) g_pVertexBuffer->Release();
 	if (g_pVertexLayout) g_pVertexLayout->Release();
 	if (g_pVertexShader) g_pVertexShader->Release();
@@ -1866,7 +1885,7 @@ void Render_to_3dtexture(long elapsed)
 	//uav[0] = Voxel_GI.GetUAV();
 	uav[0] = Octree_RW.GetUAV();
 	uav[1] = VFL.GetUAV();
-	uav[2] = count.GetUAV();
+	uav[2] = const_count.GetUAV();
 	float ClearColorRT[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red, green, blue, alpha
 	float ClearColorUAV[4] = { 0,0,0,0 }; // red, green, blue, alpha
 	unsigned int ClearColorUAVint[1] = { 0 }; // red
@@ -2177,6 +2196,24 @@ void Reset_CS()
 	g_pImmediateContext->CSSetShader(NULL, NULL, 0);
 	}
 //------------------------------------------------------- NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW 
+/*
+void update_constants()
+	{
+	ID3D11ShaderResourceView* ppSRVNULL[1] = { NULL };
+	D3D11_MAPPED_SUBRESOURCE mappedResource;
+	float *dataPtr=NULL;
+	//const_count
+	//	DX11::ConstantBufferDesc::CB_PER_CALL_DEFAULT* dataPtr;
+	g_pImmediateContext->Map(const_count.GetTexture1D(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+	
+	dataPtr = (float*)mappedResource.pData;
+
+	dataPtr[1] = dataPtr[2];		//updates after CS2
+	dataPtr[2] = dataPtr[4];		//updates after CS2
+
+	g_pImmediateContext->Unmap(const_count.GetTexture1D(), 0);
+	}*/
+
 void run_compute_shader(long elapsed)
 	{
 	 
@@ -2213,7 +2250,27 @@ void run_compute_shader(long elapsed)
 	g_pImmediateContext-
 	>CSSetShaderResources(0, 3, srv);
 	*/
+	ConstantBufferCS constantbufferCS;
+	constantbufferCS.values = XMFLOAT4(0,0,0,0);
+	g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
+	g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
 
+	for (int i = 0; i < maxlevel; i++)			//maxlevel = 8
+	{
+		constantbufferCS.values = XMFLOAT4((float)i+EPS, 0, 0, 0);
+		g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
+		g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
+
+		//run CS(VFL, count[]);
+		{
+			//flag all the voxel nodes in the list into the Octree_RW array
+			//everytime you run: count[1] = previous index, and next index = count[2]
+		}
+		//run CS2(Octree_RW, count[1,2]);
+		//update_constants();		//updates after CS2
+								//updates after CS2
+
+	}
 
 	//update your constant buffer
 	//note: I would do a new constant buffer from scratch including an int vvariable for the current octree level
@@ -2223,9 +2280,7 @@ void run_compute_shader(long elapsed)
 	constantbuffer.Projection = XMMatrixTranspose(g_Projection);
 	constantbuffer.CameraPos = XMFLOAT4(cam.position.x, cam.position.y, cam.position.z, 1);
 	constantbuffer.World = XMMatrixIdentity();	
-	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
-	g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBuffer);
-
+	
 	// RUNNNNNNN!!!!!!!!!
 	g_pImmediateContext->Dispatch(256, 1, 1);
 
@@ -2249,8 +2304,10 @@ void Render()
 	Render_to_texture(elapsed);
 	//Render_to_texture_test(elapsed);
 	Render_to_texture2(elapsed);
-
+	
+	stopwatch.start(); //restart
 	run_compute_shader(elapsed);	//could be anywhere in the render pipeline //NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW 
+	elapsed = stopwatch.elapse_micro();
 
 	Render_to_texturebright(elapsed);	//bright
 	Render_to_texturebloom(elapsed);	//bloom

@@ -127,6 +127,7 @@ float4 find_in_octree(float3 pos) {
 
 		level += 1;
 	}
+	//if octree_sr[] = 2 big error5
 	
 	return float4(midpt, 0);
 }

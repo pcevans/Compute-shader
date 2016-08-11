@@ -16,7 +16,7 @@ Texture2D txBloom : register(t5);
 
 //RWTexture3D<float4> Voxel_GI : register(u1);
 RWTexture1D<unsigned int> Octree_RW : register(u1);
-RWTexture1D<float4> VFL : register(u2);
+RWTexture1D<float> VFL : register(u2);
 RWTexture1D<unsigned int> count : register(u3);
 
 Texture3D Voxels_SR : register(t3);
@@ -98,27 +98,27 @@ uint put_in_octree(float3 pos) {
 		//Octree_RW[0] = 9;
 	
 
-	while (level != maxlevel) {
-		if (pos.x < midpt.x) {
-			if (pos.y < midpt.y) {
-				if (pos.z < midpt.z) idx = 0;
-				else idx = 6;
+		while (level != maxlevel) {
+			if (pos.x < midpt.x) {
+				if (pos.y < midpt.y) {
+					if (pos.z < midpt.z) idx = 0;
+					else idx = 6;
+				}
+				else {
+					if (pos.z < midpt.z) idx = 2;
+					else idx = 4;
+				}
 			}
 			else {
-				if (pos.z < midpt.z) idx = 2;
-				else idx = 4;
+				if (pos.y < midpt.y) {
+					if (pos.z < midpt.z) idx = 1;
+					else idx = 7;
+				}
+				else {
+					if (pos.z < midpt.z) idx = 3;
+					else idx = 5;
+				}
 			}
-		}
-		else {
-			if (pos.y < midpt.y) {
-				if (pos.z < midpt.z) idx = 1;
-				else idx = 7;
-			}
-			else {
-				if (pos.z < midpt.z) idx = 3;
-				else idx = 5;
-			}
-		}
 
 		currdex = octdex + idx;
 		if (level + 1 != maxlevel) {
@@ -373,7 +373,9 @@ PS_MRTOutput PS(PS_INPUT input) : SV_Target
 	float idx = 0;
 	
 	InterlockedAdd(count[0], 1, idx);
-	VFL[idx] = viewpos;
+	VFL[idx * 3 + 0] = viewpos.x;
+	VFL[idx * 3 + 1] = viewpos.y;
+	VFL[idx * 3 + 2] = viewpos.z;
 
 	/*Octree_RW[0] = 121;
 	Octree_RW[1] = 9;

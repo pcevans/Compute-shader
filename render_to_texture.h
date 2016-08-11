@@ -14,6 +14,7 @@ class RenderTextureClass
 		bool uav;
 		
 	public:
+	ID3D11Texture1D* GetTexture1D() { return m_renderTargetTexture1D; }
 		int w, h;
 		RenderTextureClass()
 			{

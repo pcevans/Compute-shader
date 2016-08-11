@@ -10,6 +10,8 @@
 #include "resource.h"
 //using namespace std;
 
+#define EPS 0.00001
+
 struct SimpleVertex
 {
 	XMFLOAT3 Pos;
@@ -34,7 +36,15 @@ public:
 	XMFLOAT4 SunPos;
 	XMFLOAT4 DayTimer;
 };
-
+class ConstantBufferCS
+{
+public:
+	ConstantBufferCS()
+	{
+		values = XMFLOAT4(0, 0, 0, 0);
+	}
+	XMFLOAT4 values;
+};
 //********************************************
 class StopWatchMicro_
 {
