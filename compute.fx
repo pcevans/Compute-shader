@@ -1,11 +1,8 @@
 #include "shaderheader.h"
 
-
 RWTexture1D<unsigned int> Octree_RW : register(u1);
 RWTexture1D<float> VFL : register(u2);
 RWTexture1D<unsigned int> count : register(u3);
-
-
 
 cbuffer ConstantBuffer : register(b0)
 {
@@ -95,11 +92,10 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 	float3 midpt = float3(0, 0, 0);
 	float midsize = vxarea / 4.;
 	uint idx = 0;
-	//go from 0 to VFL[0]
+	//go from 0 to count[0]
 	[allow_uav_condition]
 	for (int i = 0; i < numpassesflag; i++)
 		{
-		//InterlockedAdd(?????, 1, currindex); // put incrementing variable here
 		uint vocel_to_work_on = DTid.x + NUM_THREADS*i;
 		if (vocel_to_work_on >= count[0])break;
 
@@ -169,13 +165,13 @@ void CS2(uint3 DTid : SV_DispatchThreadID)
 	float fnumpassesflag = ceil((float)num_of_flag_area / (float)NUM_THREADS);
 	int numpassesflag = (int)fnumpassesflag;
 
-	//go from 0 to VFL[0]
+
 	[allow_uav_condition]
 	for (int i = 0; i < numpassesflag; i++)
 		{
-		//InterlockedAdd(?????, 1, currindex); // put incrementing variable here
 		int ocv_to_work_on = DTid.x + NUM_THREADS*i;
 		if (ocv_to_work_on >= num_of_flag_area)break;
+		ocv_to_work_on += count[1];
 		if (Octree_RW[ocv_to_work_on] != 2)continue;
 		uint free_space = 0;
 		InterlockedAdd(count[4], 8, free_space);

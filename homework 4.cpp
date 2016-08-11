@@ -49,7 +49,8 @@ ID3D11PixelShader*                  g_pPixelShader = NULL;
 ID3D11VertexShader*                 g_pEffectVS = NULL;
 ID3D11PixelShader*                  g_pEffectPS = NULL;
 
-ID3D11ComputeShader*                g_pOctreeCS = NULL;	//NEW
+ID3D11ComputeShader*                g_pFlaggingCS = NULL;	//NEW
+ID3D11ComputeShader*                g_pBuildingCS = NULL;	//NEW
 
 ID3D11VertexShader*                 g_pShadowVS = NULL;
 ID3D11PixelShader*                  g_pShadowPS = NULL;
@@ -610,7 +611,7 @@ HRESULT InitDevice()
 	if (FAILED(hr))
 		return hr;
 
-	// Compute shader
+	// Compute shader flagging stage
 	pPSBlob = NULL;
 	hr = CompileShaderFromFile(L"compute.fx", "CS", "cs_5_0", &pPSBlob);
 	if(FAILED(hr))
@@ -619,9 +620,23 @@ HRESULT InitDevice()
 				   L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 		}
-	hr = g_pd3dDevice->CreateComputeShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pOctreeCS);
+	hr = g_pd3dDevice->CreateComputeShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pFlaggingCS);
 	pPSBlob->Release();
 	if(FAILED(hr))
+		return hr;
+
+	// Compute shader building stage
+	pPSBlob = NULL;
+	hr = CompileShaderFromFile(L"compute.fx", "CS2", "cs_5_0", &pPSBlob);
+	if (FAILED(hr))
+	{
+		MessageBox(NULL,
+			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
+		return hr;
+	}
+	hr = g_pd3dDevice->CreateComputeShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pBuildingCS);
+	pPSBlob->Release();
+	if (FAILED(hr))
 		return hr;
 
 	// Define the input layout
@@ -2232,11 +2247,11 @@ void run_compute_shader(long elapsed)
 	//I do a lot of resetting = set things to NULL, I don't know it this all is necessary!!!!!
 	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
 	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->HSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->DSSetShader(NULL, NULL, 0);
+	//g_pImmediateContext->HSSetShader(NULL, NULL, 0);
+	//g_pImmediateContext->DSSetShader(NULL, NULL, 0);
 	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
 	
-	g_pImmediateContext->CSSetShader(g_pOctreeCS, NULL, 0);
+	
 
 	//				SET YOUR READ/WRITE STUFF:
 	/*
@@ -2250,10 +2265,13 @@ void run_compute_shader(long elapsed)
 	g_pImmediateContext-
 	>CSSetShaderResources(0, 3, srv);
 	*/
+
+	
 	ConstantBufferCS constantbufferCS;
 	constantbufferCS.values = XMFLOAT4(0,0,0,0);
 	g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
 	g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
+	g_pImmediateContext->CSSetShader(g_pFlaggingCS, NULL, 0);
 
 	for (int i = 0; i < maxlevel; i++)			//maxlevel = 8
 	{
@@ -2284,11 +2302,6 @@ void run_compute_shader(long elapsed)
 	// RUNNNNNNN!!!!!!!!!
 	g_pImmediateContext->Dispatch(256, 1, 1);
 
-	// make a second compute shader
-	// run both of them in a loop as many times as octree levels
-	// ???
-	// success
-
 	Reset_CS();
 }
 
@@ -2306,7 +2319,7 @@ void Render()
 	Render_to_texture2(elapsed);
 	
 	stopwatch.start(); //restart
-	run_compute_shader(elapsed);	//could be anywhere in the render pipeline //NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW NEW 
+	run_compute_shader(elapsed);	//could be anywhere in the render pipeline //NEW NEW 
 	elapsed = stopwatch.elapse_micro();
 
 	Render_to_texturebright(elapsed);	//bright

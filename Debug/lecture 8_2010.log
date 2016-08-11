@@ -1,4 +1,4 @@
-﻿  render_to_texture.cpp
+﻿  homework 4.cpp
 c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(12): warning C4005: 'DXGI_STATUS_OCCLUDED': macro redefinition
   c:\program files (x86)\windows kits\8.1\include\shared\winerror.h(50092): note: see previous definition of 'DXGI_STATUS_OCCLUDED'
 c:\program files (x86)\microsoft directx sdk (june 2010)\include\dxgitype.h(13): warning C4005: 'DXGI_STATUS_CLIPPED': macro redefinition
@@ -93,31 +93,82 @@ c:\program files (x86)\microsoft directx sdk (june 2010)\include\xnamathconvert.
 c:\program files (x86)\microsoft directx sdk (june 2010)\include\xnamathvector.inl(1269): warning C4838: conversion from 'unsigned int' to 'INT' requires a narrowing conversion
 c:\program files (x86)\microsoft directx sdk (june 2010)\include\xnamathmisc.inl(518): warning C4838: conversion from 'unsigned int' to 'INT' requires a narrowing conversion
 c:\program files (x86)\microsoft directx sdk (june 2010)\include\xnamathmisc.inl(519): warning C4838: conversion from 'unsigned int' to 'INT' requires a narrowing conversion
-c:\users\rblakeman\documents\github\compute-shader\groundwork.h(72): warning C4552: '/': operator has no effect; expected operator with side-effect
-c:\users\rblakeman\documents\github\compute-shader\groundwork.h(113): warning C4100: 'ViewMatrix': unreferenced formal parameter
-c:\users\rblakeman\documents\github\compute-shader\groundwork.h(149): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-c:\users\rblakeman\documents\github\compute-shader\groundwork.h(196): warning C4101: 'z': unreferenced local variable
-c:\users\rblakeman\documents\github\compute-shader\groundwork.h(196): warning C4101: 'y': unreferenced local variable
-c:\users\rblakeman\documents\github\compute-shader\groundwork.h(196): warning C4101: 'x': unreferenced local variable
-c:\users\rblakeman\documents\github\compute-shader\groundwork.h(233): warning C4244: '=': conversion from 'double' to 'int', possible loss of data
-c:\users\rblakeman\documents\github\compute-shader\groundwork.h(239): warning C4244: '=': conversion from 'int' to 'FLOAT', possible loss of data
-c:\users\rblakeman\documents\github\compute-shader\groundwork.h(240): warning C4244: '=': conversion from 'int' to 'FLOAT', possible loss of data
-c:\users\rblakeman\documents\github\compute-shader\groundwork.h(241): warning C4244: '=': conversion from 'int' to 'FLOAT', possible loss of data
-c:\users\rblakeman\documents\github\compute-shader\groundwork.h(314): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-c:\users\rblakeman\documents\github\compute-shader\groundwork.h(317): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-c:\users\rblakeman\documents\github\compute-shader\controller.h(106): warning C4244: '=': conversion from 'int' to 'WORD', possible loss of data
-c:\users\rblakeman\documents\github\compute-shader\controller.h(107): warning C4244: '=': conversion from 'int' to 'WORD', possible loss of data
-c:\users\rblakeman\documents\github\compute-shader\render_to_texture.cpp(19): warning C4101: 'renderTargetViewDesc': unreferenced local variable
-c:\users\rblakeman\documents\github\compute-shader\render_to_texture.cpp(158): warning C4100: 'mipmaps': unreferenced formal parameter
-c:\users\rblakeman\documents\github\compute-shader\render_to_texture.cpp(255): warning C4100: 'mipmaps': unreferenced formal parameter
-c:\users\rblakeman\documents\github\compute-shader\render_to_texture.cpp(344): warning C4100: 'mipmaps': unreferenced formal parameter
-c:\users\rblakeman\documents\github\compute-shader\render_to_texture.cpp(344): warning C4100: 'uav_': unreferenced formal parameter
-c:\users\rblakeman\documents\github\compute-shader\render_to_texture.cpp(363): warning C4101: 'renderTargetViewDesc': unreferenced local variable
-c:\users\rblakeman\documents\github\compute-shader\render_to_texture.cpp(364): warning C4101: 'shaderResourceViewDesc': unreferenced local variable
-c:\users\rblakeman\documents\github\compute-shader\render_to_texture.cpp(173): warning C4701: potentially uninitialized local variable 'textureWidth' used
-c:\users\rblakeman\documents\github\compute-shader\render_to_texture.cpp(174): warning C4701: potentially uninitialized local variable 'textureHeight' used
-c:\users\rblakeman\documents\github\compute-shader\render_to_texture.cpp(265): warning C4701: potentially uninitialized local variable 'textureWidth' used
-c:\users\rblakeman\documents\github\compute-shader\render_to_texture.cpp(359): warning C4701: potentially uninitialized local variable 'textureWidth' used
-c:\users\rblakeman\documents\github\compute-shader\render_to_texture.cpp(360): warning C4701: potentially uninitialized local variable 'textureHeight' used
-  lecture 8_2010.vcxproj -> C:\Users\RBlakeman\Documents\GitHub\Compute-shader\Debug\homework 4.exe
-  lecture 8_2010.vcxproj -> C:\Users\RBlakeman\Documents\GitHub\Compute-shader\Debug\homework 4.pdb (Full PDB)
+c:\users\gameprogrammer\desktop\compute shader\compute shader\groundwork.h(72): warning C4552: '/': operator has no effect; expected operator with side-effect
+c:\users\gameprogrammer\desktop\compute shader\compute shader\groundwork.h(113): warning C4100: 'ViewMatrix': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\groundwork.h(149): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\groundwork.h(196): warning C4101: 'z': unreferenced local variable
+c:\users\gameprogrammer\desktop\compute shader\compute shader\groundwork.h(196): warning C4101: 'y': unreferenced local variable
+c:\users\gameprogrammer\desktop\compute shader\compute shader\groundwork.h(196): warning C4101: 'x': unreferenced local variable
+c:\users\gameprogrammer\desktop\compute shader\compute shader\groundwork.h(233): warning C4244: '=': conversion from 'double' to 'int', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\groundwork.h(239): warning C4244: '=': conversion from 'int' to 'FLOAT', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\groundwork.h(240): warning C4244: '=': conversion from 'int' to 'FLOAT', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\groundwork.h(241): warning C4244: '=': conversion from 'int' to 'FLOAT', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\groundwork.h(314): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\groundwork.h(317): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\controller.h(106): warning C4244: '=': conversion from 'int' to 'WORD', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\controller.h(107): warning C4244: '=': conversion from 'int' to 'WORD', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(139): warning C4244: 'argument': conversion from 'time_t' to 'unsigned int', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(939): warning C4100: 'keyFlags': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(939): warning C4100: 'y': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(939): warning C4100: 'x': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(939): warning C4100: 'fDoubleClick': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(939): warning C4100: 'hwnd': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(940): warning C4100: 'keyFlags': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(940): warning C4100: 'y': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(940): warning C4100: 'x': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(940): warning C4100: 'fDoubleClick': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(940): warning C4100: 'hwnd': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(941): warning C4100: 'cRepeat': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(941): warning C4100: 'ch': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(941): warning C4100: 'hwnd': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(942): warning C4100: 'keyFlags': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(942): warning C4100: 'y': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(942): warning C4100: 'x': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(942): warning C4100: 'hwnd': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(943): warning C4100: 'keyFlags': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(943): warning C4100: 'y': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(943): warning C4100: 'x': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(943): warning C4100: 'hwnd': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1002): warning C4100: 'lpCreateStruct': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1018): warning C4100: 'id': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1018): warning C4100: 'hwnd': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1021): warning C4100: 'flags': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1021): warning C4100: 'cRepeat': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1021): warning C4100: 'fDown': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1021): warning C4100: 'hwnd': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1043): warning C4100: 'flags': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1043): warning C4100: 'cRepeat': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1043): warning C4100: 'fDown': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1043): warning C4100: 'hwnd': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1142): warning C4459: declaration of 'g_pd3dDevice' hides global declaration
+  c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(19): note: see declaration of 'g_pd3dDevice'
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1142): warning C4459: declaration of 'vertex_count' hides global declaration
+  c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(72): note: see declaration of 'vertex_count'
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1198): warning C4100: 'height': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1198): warning C4100: 'width': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1285): warning C4018: '<': signed/unsigned mismatch
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1533): warning C4018: '<': signed/unsigned mismatch
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1535): warning C4456: declaration of 'constantbuffer' hides previous local declaration
+  c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1480): note: see declaration of 'constantbuffer'
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1585): warning C4100: 'elapsed': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1646): warning C4100: 'elapsed': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1700): warning C4100: 'elapsed': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1780): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1781): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1785): warning C4244: '=': conversion from 'double' to 'FLOAT', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1786): warning C4244: '=': conversion from 'double' to 'FLOAT', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1787): warning C4244: '=': conversion from 'double' to 'FLOAT', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1789): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1950): warning C4018: '<': signed/unsigned mismatch
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1981): warning C4018: '<': signed/unsigned mismatch
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(1895): warning C4100: 'elapsed': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2009): warning C4100: 'elapsed': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2081): warning C4100: 'elapsed': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2187): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2278): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2232): warning C4100: 'elapsed': unreferenced formal parameter
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2311): warning C4244: 'initializing': conversion from 'long double' to 'long', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2314): warning C4244: 'argument': conversion from 'long' to 'float', possible loss of data
+c:\users\gameprogrammer\desktop\compute shader\compute shader\homework 4.cpp(2323): warning C4244: '=': conversion from 'long double' to 'long', possible loss of data
+  lecture 8_2010.vcxproj -> C:\Users\gameprogrammer\Desktop\Compute shader\Compute shader\Debug\homework 4.exe
+  lecture 8_2010.vcxproj -> C:\Users\gameprogrammer\Desktop\Compute shader\Compute shader\Debug\homework 4.pdb (Full PDB)
