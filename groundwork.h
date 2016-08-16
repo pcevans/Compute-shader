@@ -8,6 +8,7 @@
 #include <vector>
 #include <time.h>
 #include "resource.h"
+#include "shaderheader.h"
 //using namespace std;
 
 #define EPS 0.00001
@@ -229,7 +230,7 @@ public:
 	voxel_()
 	{
 		vbuffer = NULL;
-		size = 256;
+		size = vxarea;
 		anz = pow(size,3);
 		v = new SimpleVertex[anz];
 		for (int xx = 0; xx < size; xx++)

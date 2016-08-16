@@ -73,7 +73,7 @@ VS_OUTPUT VS(VS_INPUT vsInput)
 
 float4 find_in_octree(float3 pos) {
 	uint level = 0;
-	uint octdex = 1;
+	uint octdex = 0;
 	uint currdex = 0;
 	float3 midpt = float3(0, 0, 0);
 	float midsize = vxarea / 4.;
@@ -127,7 +127,6 @@ float4 find_in_octree(float3 pos) {
 
 		level += 1;
 	}
-	//if octree_sr[] = 2 big error5
 	
 	return float4(midpt, 0);
 }

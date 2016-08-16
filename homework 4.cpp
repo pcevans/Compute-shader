@@ -6,7 +6,7 @@
 //--------------------------------------------------------------------------------------
 
 #include "render_to_texture.h"
-#include "shaderheader.h"
+//#include "shaderheader.h"
 #include <fstream>
 unsigned int put_in_octree(XMFLOAT3 pos);
 //--------------------------------------------------------------------------------------
@@ -1901,26 +1901,24 @@ void Render_to_3dtexture(long elapsed)
 	uav[0] = Octree_RW.GetUAV();
 	uav[1] = VFL.GetUAV();
 	uav[2] = const_count.GetUAV();
+	
 	float ClearColorRT[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red, green, blue, alpha
-	float ClearColorUAV[4] = { 0,0,0,0 }; // red, green, blue, alpha
-	unsigned int ClearColorUAVint[1] = { 0 }; // red
+	float ClearColorUAVfloat[1] = { 0.0f }; // one value
+	unsigned int ClearColorUAVint[1] = { 0 }; // one value
 
 	// Clear render target, UAV & shaders, set render target & primitive topology
 	g_pImmediateContext->ClearRenderTargetView(RenderTarget, ClearColorRT);
-	g_pImmediateContext->ClearUnorderedAccessViewFloat(uav[1], ClearColorUAV);
 	g_pImmediateContext->ClearUnorderedAccessViewUint(uav[0], ClearColorUAVint);
+	g_pImmediateContext->ClearUnorderedAccessViewFloat(uav[1], ClearColorUAVfloat);
+	g_pImmediateContext->ClearUnorderedAccessViewUint(uav[2], ClearColorUAVint);
 	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0, 0);
-	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RenderTarget, 0, 1, 2, uav, 0);
+	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RenderTarget, 0, 1, 3, uav, 0);
 	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
 	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
 	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
 	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	XMMATRIX view = cam.get_matrix(&g_View);
-	//XMMATRIX viewsub;
-
-
-
 
 	UINT stride = sizeof(SimpleVertex);
 	UINT offset = 0;
@@ -1982,7 +1980,6 @@ void Render_to_3dtexture(long elapsed)
 	{
 		worldmatrix = smokeray[ii]->get_matrix(view);
 
-		//viewsub = smokeray[ii]->get_matrix(view);
 		constantbuffer.World = XMMatrixTranspose(worldmatrix);
 		constantbuffer.info = XMFLOAT4(smokeray[ii]->transparency, 1, 1, 1);
 		g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
@@ -2254,8 +2251,6 @@ void run_compute_shader(long elapsed)
 	//I do a lot of resetting = set things to NULL, I don't know it this all is necessary!!!!!
 	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
 	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
-	//g_pImmediateContext->HSSetShader(NULL, NULL, 0);
-	//g_pImmediateContext->DSSetShader(NULL, NULL, 0);
 	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
 	
 	
@@ -2281,7 +2276,7 @@ void run_compute_shader(long elapsed)
 	for (int i = 0; i < maxlevel; i++)			//maxlevel = 8
 	{
 		//update your constant buffer
-		constantbufferCS.values = XMFLOAT4((float)i+EPS, 0, 0, 0);
+		constantbufferCS.values = XMFLOAT4((float)i+1.0f+EPS, 0, 0, 0);
 		g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
 		g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
 
@@ -2289,13 +2284,13 @@ void run_compute_shader(long elapsed)
 		//flag all the voxel nodes in the list into the Octree_RW array
 		//everytime you run: count[1] = previous index, and next index = count[2]
 		g_pImmediateContext->CSSetShader(g_pFlaggingCS, NULL, 0);
-		g_pImmediateContext->Dispatch(256, 1, 1);
+		g_pImmediateContext->Dispatch(NUM_THREADS, 1, 1);
 		
 		//run CS2(Octree_RW, count[1,2]);
 		//update_constants();		//updates after CS2
 								//updates after CS2
 		g_pImmediateContext->CSSetShader(g_pBuildingCS, NULL, 0);
-		g_pImmediateContext->Dispatch(256, 1, 1);
+		g_pImmediateContext->Dispatch(NUM_THREADS, 1, 1);
 
 	}	
 
@@ -2311,14 +2306,14 @@ void Render()
 	cam.animation(elapsed);
 	Render_to_3dtexture(elapsed);
 	//Render_to_test(elapsed);
-	Render_to_texture(elapsed);
-	//Render_to_texture_test(elapsed);
-	Render_to_texture2(elapsed);
-	
+
 	stopwatch.start(); //restart
 	run_compute_shader(elapsed);	//could be anywhere in the render pipeline //NEW NEW 
 	elapsed = stopwatch.elapse_micro();
-
+	
+	Render_to_texture(elapsed);
+	//Render_to_texture_test(elapsed);
+	Render_to_texture2(elapsed);
 	Render_to_texturebright(elapsed);	//bright
 	Render_to_texturebloom(elapsed);	//bloom
 	Render_to_texture3(elapsed);

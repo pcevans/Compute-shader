@@ -74,21 +74,21 @@ uint put_in_octree(float3 pos, uint level) {
 //		4 - octree index counter (cs2) = same as [2], but can be changed during CS2
 ////
 
-[numthreads(NUM_THREADS, 1, 1)]	// means, DTid.x goes from 0 to 511 !!!!!!!!!
+[numthreads(NUM_THREADS, 1, 1)]	// means, DTid.x goes from 0 to NUM_THREADS !!!!!!!!!
 void CS(uint3 DTid : SV_DispatchThreadID)
 	{
-	
 	if (DTid.x == 0)
 		{
 		count[1] = count[2];	//updates after CS2
-		count[2] = count[4];		//updates after CS2
+		count[2] = count[4];	//updates after CS2
 		}
-	//how many passes do you need? We have DTid.x going from 0 to 511
+	//how many passes do you need? We have DTid.x going from 0 to NUM_THREADS
 	float fnumpassesflag = ceil((float)count[0] / (float)NUM_THREADS);
 	int numpassesflag = (int)fnumpassesflag;
+
 	uint octdex = 0;
 	uint currdex = 0;
-	int maxlevel = (int)CBvalues.x;
+	int currlevel = (int)CBvalues.x;
 	float3 midpt = float3(0, 0, 0);
 	float midsize = vxarea / 4.;
 	uint idx = 0;
@@ -97,7 +97,7 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 	for (int i = 0; i < numpassesflag; i++)
 		{
 		uint voxel_to_work_on = DTid.x + NUM_THREADS*i;
-		if (voxel_to_work_on >= count[0])break;
+		if (voxel_to_work_on >= count[0]) break;
 
 		
 		float px = VFL[voxel_to_work_on * 3 + 0];
@@ -105,7 +105,7 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 		float pz = VFL[voxel_to_work_on * 3 + 2];
 		float3 pos = float3(px, py, pz);
 		[allow_uav_condition]
-		for (int level = 0; level < maxlevel; level++)
+		for (int level = 0; level < currlevel; level++)
 			{
 			if (pos.x < midpt.x)
 				{
@@ -135,6 +135,7 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 				}
 
 			currdex = octdex + idx;
+			octdex = Octree_RW[currdex];
 
 			if (idx % 2 == 0) midpt.x -= midsize;
 			else midpt.x += midsize;
@@ -148,7 +149,7 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 			midsize = midsize / 2.;
 			}
 
-		Octree_RW[currdex] = 2;
+		Octree_RW[currdex] = 1;
 
 		}
 
@@ -165,14 +166,14 @@ void CS2(uint3 DTid : SV_DispatchThreadID)
 	float fnumpassesflag = ceil((float)num_of_flag_area / (float)NUM_THREADS);
 	int numpassesflag = (int)fnumpassesflag;
 
-
 	[allow_uav_condition]
 	for (int i = 0; i < numpassesflag; i++)
 		{
+		if (CBvalues.x == maxlevel) break; // don't index the last level
 		int ocv_to_work_on = DTid.x + NUM_THREADS*i;
-		if (ocv_to_work_on >= num_of_flag_area)break;
+		if (ocv_to_work_on >= num_of_flag_area) break; // don't run if there are no more indices to work on
 		ocv_to_work_on += count[1];
-		if (Octree_RW[ocv_to_work_on] != 2)continue;
+		if (Octree_RW[ocv_to_work_on] != 1) continue; // go to next iteration of loop if not flagged
 		uint free_space = 0;
 		InterlockedAdd(count[4], 8, free_space);
 		
