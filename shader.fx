@@ -348,11 +348,11 @@ PS_MRTOutput PS(PS_INPUT input) : SV_Target
 	
 	/////////////////////////////////////////////////////////
 
-	/*Octree_RW[1] = 1;
-	Octree_RW[2] = 0;
+	/*Octree_RW[0] = 1;
+	Octree_RW[1] = 0;
+	Octree_RW[2] = 1;
 	Octree_RW[3] = 1;
 	Octree_RW[4] = 1;
-	Octree_RW[5] = 1;
 	Octree_RW[6] = 1;
 	Octree_RW[7] = 1;
 	Octree_RW[8] = 1;*/
@@ -368,7 +368,7 @@ PS_MRTOutput PS(PS_INPUT input) : SV_Target
 	//put_in_octree(float3(-0.1, -0.1, -0.1));
 	//put_in_octree(viewpos);
 
-	//float idx = 0;
+	float idx = 0;
 	
 	/*InterlockedAdd(count[0], 1, idx);
 	VFL[idx * 3 + 0] = viewpos.x;
@@ -376,9 +376,9 @@ PS_MRTOutput PS(PS_INPUT input) : SV_Target
 	VFL[idx * 3 + 2] = viewpos.z;*/
 
 	count[0] = 1;
-	VFL[0] = 1;
-	VFL[1] = 1;
-	VFL[2] = 1;
+	VFL[0] = .1;
+	VFL[1] = .1;
+	VFL[2] = .1;
 	/*VFL[3] = 1;
 	VFL[4] = 1;
 	VFL[5] = 1;*/

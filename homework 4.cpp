@@ -9,6 +9,9 @@
 //#include "shaderheader.h"
 #include <fstream>
 unsigned int put_in_octree(XMFLOAT3 pos);
+void start_octree();
+void put_in_octree_fake(int id, int level);
+void build_octree(int id, int level);
 //--------------------------------------------------------------------------------------
 // Global Variables
 //--------------------------------------------------------------------------------------
@@ -49,8 +52,10 @@ ID3D11PixelShader*                  g_pPixelShader = NULL;
 ID3D11VertexShader*                 g_pEffectVS = NULL;
 ID3D11PixelShader*                  g_pEffectPS = NULL;
 
+ID3D11ComputeShader*                g_pStartingCS = NULL;	//NEW
 ID3D11ComputeShader*                g_pFlaggingCS = NULL;	//NEW
 ID3D11ComputeShader*                g_pBuildingCS = NULL;	//NEW
+ID3D11ComputeShader*                g_CSfake = NULL;	//NEW
 
 ID3D11VertexShader*                 g_pShadowVS = NULL;
 ID3D11PixelShader*                  g_pShadowPS = NULL;
@@ -104,10 +109,11 @@ float								offsetx = 2;
 float								offsety = 0;
 float								offsetz = 2;
 bool                                madeClouds = false;
+int									octree_count[5];
 
 #define ROCKETRADIUS				10
 
-int GIarr[100000];
+int GIarr[1000];
 
 //--------------------------------------------------------------------------------------
 // Forward declarations
@@ -137,18 +143,32 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 		return 0;
 	}
 	srand(time(0));
+	
+	for (int i = 0; i < 5; i++) {
+		octree_count[i] = 0;
+	}
 
-	for (int i = 0; i < 100000; i++) {
+	for (int i = 0; i < 100; i++) 
+	{
 		GIarr[i] = 0;
 	}
 	
 	std::ofstream tfile;
 	tfile.open("test.txt");
 
-	put_in_octree(XMFLOAT3(-.1,-.1,-.1));
-	put_in_octree(XMFLOAT3(.1, .1, .1));
+	octree_count[0] = 1;
+	start_octree();
+	for (int j = 1; j <= maxlevel; j++)
+	{
+		for (int i = 0; i < 512; i++)
+		{
+			put_in_octree_fake(i, j);
+			build_octree(i, j);
+		}
+	}
+	//put_in_octree(XMFLOAT3(.1, .1, .1));
 
-	for (int i = 0; i < 100000; i++) {
+	for (int i = 0; i < 1000; i++) {
 		tfile << "Octree_RW[" << i << "] = " << GIarr[i] << ";\n";
 	}
 
@@ -611,6 +631,20 @@ HRESULT InitDevice()
 	if (FAILED(hr))
 		return hr;
 
+	// Compute shader starting stage
+	pPSBlob = NULL;
+	hr = CompileShaderFromFile(L"compute.fx", "CSstart", "cs_5_0", &pPSBlob);
+	if (FAILED(hr))
+	{
+		MessageBox(NULL,
+			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
+		return hr;
+	}
+	hr = g_pd3dDevice->CreateComputeShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pStartingCS);
+	pPSBlob->Release();
+	if (FAILED(hr))
+		return hr;
+
 	// Compute shader flagging stage
 	pPSBlob = NULL;
 	hr = CompileShaderFromFile(L"compute.fx", "CS", "cs_5_0", &pPSBlob);
@@ -638,6 +672,21 @@ HRESULT InitDevice()
 	pPSBlob->Release();
 	if (FAILED(hr))
 		return hr;
+
+	pPSBlob = NULL;
+	hr = CompileShaderFromFile(L"compute.fx", "CSfake", "cs_5_0", &pPSBlob);
+	if (FAILED(hr))
+	{
+		MessageBox(NULL,
+			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
+		return hr;
+	}
+	hr = g_pd3dDevice->CreateComputeShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_CSfake);
+	pPSBlob->Release();
+	if (FAILED(hr))
+		return hr;
+
+
 
 	// Define the input layout
 	D3D11_INPUT_ELEMENT_DESC layout[] =
@@ -2280,6 +2329,10 @@ void run_compute_shader(long elapsed)
 		g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
 		g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
 
+		//run CSstart(count[2], count[4]);
+		g_pImmediateContext->CSSetShader(g_pStartingCS, NULL, 0);
+		g_pImmediateContext->Dispatch(1, 1, 1);
+
 		//run CS(VFL, count[]);
 		//flag all the voxel nodes in the list into the Octree_RW array
 		//everytime you run: count[1] = previous index, and next index = count[2]
@@ -2292,6 +2345,9 @@ void run_compute_shader(long elapsed)
 		g_pImmediateContext->CSSetShader(g_pBuildingCS, NULL, 0);
 		g_pImmediateContext->Dispatch(NUM_THREADS, 1, 1);
 
+		/*g_pImmediateContext->CSSetShader(g_CSfake, NULL, 0);
+		g_pImmediateContext->Dispatch(NUM_THREADS, 1, 1);*/
+		
 	}	
 
 	Reset_CS();
@@ -2319,3 +2375,134 @@ void Render()
 	Render_to_texture3(elapsed);
 	Render_to_screen(elapsed);
 }
+
+void start_octree() {
+	octree_count[2] = 0;
+	octree_count[4] = 8;
+}
+
+void put_in_octree_fake(int id, int level)
+{
+	if (id == 0)
+	{
+		octree_count[1] = octree_count[2];	//updates after CS2
+		octree_count[2] = octree_count[4];	//updates after CS2
+
+	}
+
+	//how many passes do you need? We have DTid.x going from 0 to NUM_THREADS
+	float fnumpassesflag = ceil((float)octree_count[0] / (float)NUM_THREADS);
+	int numpassesflag = (int)fnumpassesflag;
+
+	unsigned int octdex = 0;
+	unsigned int currdex = 0;
+	int currlevel = (int)level;
+	XMFLOAT3 midpt = XMFLOAT3(0, 0, 0);
+	float midsize = vxarea / 4.;
+	unsigned int idx = 0;
+
+	if (id != 0)
+	{
+		return;
+	}
+
+	//go from 0 to count[0]
+	//[allow_uav_condition]
+	for (int i = 0; i < numpassesflag; i++)
+	{
+		unsigned int voxel_to_work_on = id + NUM_THREADS*i;
+		if (voxel_to_work_on >= octree_count[0]) break;
+
+
+		/*float px = VFL[voxel_to_work_on * 3 + 0];
+		float py = VFL[voxel_to_work_on * 3 + 1];
+		float pz = VFL[voxel_to_work_on * 3 + 2];
+		float3 pos = float3(px, py, pz);*/
+
+		XMFLOAT3 pos = XMFLOAT3(2, 2, 2);
+
+		//[allow_uav_condition]
+		for (int level = 0; level < currlevel; level++)
+		{
+			if (pos.x < midpt.x)
+			{
+				if (pos.y < midpt.y)
+				{
+					if (pos.z < midpt.z) idx = 0;
+					else idx = 6;
+				}
+				else
+				{
+					if (pos.z < midpt.z) idx = 2;
+					else idx = 4;
+				}
+			}
+			else
+			{
+				if (pos.y < midpt.y)
+				{
+					if (pos.z < midpt.z) idx = 1;
+					else idx = 7;
+				}
+				else
+				{
+					if (pos.z < midpt.z) idx = 3;
+					else idx = 5;
+				}
+			}
+
+			currdex = octdex + idx;
+			octdex = GIarr[currdex];
+
+			if (idx % 2 == 0) midpt.x -= midsize;
+			else midpt.x += midsize;
+
+			if (idx < 4) midpt.z -= midsize;
+			else midpt.z += midsize;
+
+			if (idx < 6 && idx > 1) midpt.y += midsize;
+			else midpt.y -= midsize;
+
+			midsize = midsize / 2.;
+		}
+
+		GIarr[currdex] = 1;
+
+	}
+}
+
+
+void build_octree(int id, int level) 
+{
+	//how many passes do you need? We have DTid.x going from 0 to 511
+
+	/*if (id != 5)
+	{
+		return;
+	}*/
+
+	int num_of_flag_area = octree_count[2] - octree_count[1];
+	float fnumpassesflag = ceil((float)num_of_flag_area / (float)NUM_THREADS);
+	int numpassesflag = (int)fnumpassesflag;
+
+	//[allow_uav_condition]
+	for (int i = 0; i < numpassesflag; i++)
+	{
+		if (level == maxlevel) break; // don't index the last level
+		int ocv_to_work_on = id + NUM_THREADS*i;
+		if (ocv_to_work_on >= num_of_flag_area)
+			break; // don't run if there are no more indices to work on
+
+		ocv_to_work_on += octree_count[1];
+		if (GIarr[ocv_to_work_on] != 1)
+			continue; // go to next iteration of loop if not flagged
+
+		unsigned int free_space = octree_count[4];
+		octree_count[4] += 8;
+		
+
+		GIarr[ocv_to_work_on] = free_space;
+	}
+
+}
+
