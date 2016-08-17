@@ -10,7 +10,7 @@
 #include <fstream>
 unsigned int put_in_octree(XMFLOAT3 pos);
 void start_octree();
-void put_in_octree_fake(int id, int level);
+void put_in_octree_fake(int id, float level);
 void build_octree(int id, int level);
 //--------------------------------------------------------------------------------------
 // Global Variables
@@ -88,6 +88,8 @@ ID3D11ShaderResourceView*           g_pTextureRV = NULL;
 ID3D11ShaderResourceView*           g_pSkyboxTex = NULL; //skybox
 ID3D11ShaderResourceView*           normaltex = NULL;
 
+ID3D11Texture1D*					debugbuffer;
+
 ID3D11SamplerState*                 g_pSamplerLinear = NULL;
 
 XMMATRIX                            g_World;
@@ -113,7 +115,7 @@ int									octree_count[5];
 
 #define ROCKETRADIUS				10
 
-int GIarr[1000];
+int GIarr[100];
 
 //--------------------------------------------------------------------------------------
 // Forward declarations
@@ -158,17 +160,21 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 	octree_count[0] = 1;
 	start_octree();
-	for (int j = 1; j <= maxlevel; j++)
+	for (int j = 0; j < maxlevel; j++)
 	{
 		for (int i = 0; i < 512; i++)
 		{
-			put_in_octree_fake(i, j);
-			build_octree(i, j);
+			put_in_octree_fake(i, (float)j + 1.0f + EPS);
+		}
+
+		for (int i = 0; i < 512; i++)
+		{
+			build_octree(i, (float)j + 1.0f + EPS);
 		}
 	}
 	//put_in_octree(XMFLOAT3(.1, .1, .1));
 
-	for (int i = 0; i < 1000; i++) {
+	for (int i = 0; i < 100; i++) {
 		tfile << "Octree_RW[" << i << "] = " << GIarr[i] << ";\n";
 	}
 
@@ -838,6 +844,11 @@ HRESULT InitDevice()
 	if (FAILED(hr))
 		return hr;
 
+
+
+
+
+
 	// Initialize the world matrices
 	g_World = XMMatrixIdentity();
 
@@ -925,7 +936,42 @@ HRESULT InitDevice()
 	// RenderTarget textures
 	RenderToTexture.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, TRUE);
 	Voxel_GI.Initialize_3DTex(g_pd3dDevice, 512, 512, 512, TRUE, DXGI_FORMAT_R8G8B8A8_UNORM, TRUE);
+	
+
+
+
+
 	Octree_RW.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
+	//staging texture for write back
+	D3D11_TEXTURE1D_DESC textureDesc;
+	HRESULT result;
+	D3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc;
+	D3D11_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc;
+
+	// Initialize the render target texture description.
+	ZeroMemory(&textureDesc, sizeof(textureDesc));
+	// Setup the render target texture description.
+	textureDesc.Width = 16384;
+	textureDesc.MipLevels = 1;
+	textureDesc.ArraySize = 1;
+	textureDesc.Format = DXGI_FORMAT_R32_UINT;
+	textureDesc.Usage = D3D11_USAGE_STAGING;
+	textureDesc.BindFlags = 0;
+	textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+	textureDesc.MiscFlags = 0;
+
+	result = g_pd3dDevice->CreateTexture1D(&textureDesc, NULL, &debugbuffer);
+	if (FAILED(result))
+	{
+		return false;
+	}
+
+
+
+
+
+
+	
 	VFL.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32_FLOAT, TRUE);
 	const_count.Initialize_1DTex(g_pd3dDevice, g_hWnd, 5, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
 	LightSourcePass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
@@ -2329,7 +2375,8 @@ void run_compute_shader(long elapsed)
 		g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
 		g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
 
-		//run CSstart(count[2], count[4]);
+		//run CSstart
+		//sets count[4] to 8
 		g_pImmediateContext->CSSetShader(g_pStartingCS, NULL, 0);
 		g_pImmediateContext->Dispatch(1, 1, 1);
 
@@ -2337,13 +2384,13 @@ void run_compute_shader(long elapsed)
 		//flag all the voxel nodes in the list into the Octree_RW array
 		//everytime you run: count[1] = previous index, and next index = count[2]
 		g_pImmediateContext->CSSetShader(g_pFlaggingCS, NULL, 0);
-		g_pImmediateContext->Dispatch(NUM_THREADS, 1, 1);
+		g_pImmediateContext->Dispatch(1, 1, 1);
 		
 		//run CS2(Octree_RW, count[1,2]);
 		//update_constants();		//updates after CS2
 								//updates after CS2
 		g_pImmediateContext->CSSetShader(g_pBuildingCS, NULL, 0);
-		g_pImmediateContext->Dispatch(NUM_THREADS, 1, 1);
+		g_pImmediateContext->Dispatch(1, 1, 1);
 
 		/*g_pImmediateContext->CSSetShader(g_CSfake, NULL, 0);
 		g_pImmediateContext->Dispatch(NUM_THREADS, 1, 1);*/
@@ -2351,6 +2398,34 @@ void run_compute_shader(long elapsed)
 	}	
 
 	Reset_CS();
+
+
+
+	//DEBUG!!!!!!!!!!!!!!!!!!!!!!!!!!
+	// Copy result
+	g_pImmediateContext->CopyResource(debugbuffer, Octree_RW.GetTexture1D());
+
+
+	// Update particle system data with output from Compute Shader
+	D3D11_MAPPED_SUBRESOURCE mappedResource;
+	HRESULT hr = g_pImmediateContext->Map(debugbuffer, 0, D3D11_MAP_READ, 0, &mappedResource);
+
+
+	unsigned int arr[100];
+
+	if (SUCCEEDED(hr))
+	{
+
+		unsigned int* dataView = reinterpret_cast<unsigned int*>(mappedResource.pData);
+
+		for (int ii = 0; ii < 100; ii++)
+			arr[ii] = dataView[ii];
+
+		g_pImmediateContext->Unmap(debugbuffer, 0);
+	}
+	int z;
+	z = 9;
+
 }
 
 void Render()
@@ -2381,7 +2456,7 @@ void start_octree() {
 	octree_count[4] = 8;
 }
 
-void put_in_octree_fake(int id, int level)
+void put_in_octree_fake(int id, float level)
 {
 	if (id == 0)
 	{
@@ -2419,10 +2494,10 @@ void put_in_octree_fake(int id, int level)
 		float pz = VFL[voxel_to_work_on * 3 + 2];
 		float3 pos = float3(px, py, pz);*/
 
-		XMFLOAT3 pos = XMFLOAT3(2, 2, 2);
+		XMFLOAT3 pos = XMFLOAT3(7,7,7);
 
 		//[allow_uav_condition]
-		for (int level = 0; level < currlevel; level++)
+		for (int xlevel = 0; xlevel < currlevel; xlevel++)
 		{
 			if (pos.x < midpt.x)
 			{
@@ -2476,10 +2551,10 @@ void build_octree(int id, int level)
 {
 	//how many passes do you need? We have DTid.x going from 0 to 511
 
-	/*if (id != 5)
+	if (id != 5)
 	{
 		return;
-	}*/
+	}
 
 	int num_of_flag_area = octree_count[2] - octree_count[1];
 	float fnumpassesflag = ceil((float)num_of_flag_area / (float)NUM_THREADS);

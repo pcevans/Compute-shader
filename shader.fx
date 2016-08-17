@@ -375,7 +375,7 @@ PS_MRTOutput PS(PS_INPUT input) : SV_Target
 	VFL[idx * 3 + 1] = viewpos.y;
 	VFL[idx * 3 + 2] = viewpos.z;*/
 
-	count[0] = 1;
+	count[0] = 2;
 	VFL[0] = .1;
 	VFL[1] = .1;
 	VFL[2] = .1;

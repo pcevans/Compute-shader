@@ -75,7 +75,8 @@ uint put_in_octree(float3 pos, uint level) {
 ////
 
 [numthreads(1, 1, 1)]
-void CSstart(uint3 DTid : SV_DispatchThreadID) {
+void CSstart(uint3 DTid : SV_DispatchThreadID) 
+{
 	count[2] = 0;
 	count[4] = 8;
 }
@@ -102,7 +103,7 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 
 	if (DTid.x != 0)
 	{
-		return;
+		//return;
 	}
 
 	//go from 0 to count[0]
@@ -118,8 +119,9 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 		float pz = VFL[voxel_to_work_on * 3 + 2];
 		float3 pos = float3(px, py, pz);*/
 
-		float3 pos = float3(2, 2, 2);
-
+		float3 pos = float3(7,7,7);
+		if (DTid.x ==1)
+			pos = float3(-7, 7, 7);
 		[allow_uav_condition]
 		for (int xlevel = 0; xlevel < currlevel; xlevel++)
 			{
@@ -175,10 +177,10 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 [numthreads(NUM_THREADS, 1, 1)]	// means, DTid.x goes from 0 to 511 !!!!!!!!!
 void CS2(uint3 DTid : SV_DispatchThreadID)
 {
-	/*if (DTid.x != 5)
+	if (DTid.x != 5)
 	{
-		return;
-	}*/
+		//return;
+	}
 	//how many passes do you need? We have DTid.x going from 0 to 511
 
 	int num_of_flag_area = count[2] - count[1];
