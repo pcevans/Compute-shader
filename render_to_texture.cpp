@@ -259,7 +259,7 @@ bool RenderTextureClass::Initialize_1DTex(ID3D11Device* device, HWND hwnd, int w
 	UINT textureWidth;
 	if (hwnd)  
 	{
-		textureWidth = 16384;
+		textureWidth = MAXTEX1DSIZE;
 	}
 	if (width >= 0)			textureWidth = width;
 	w = textureWidth;

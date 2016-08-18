@@ -397,7 +397,7 @@ HRESULT InitDevice()
 	ID3DBlob* pPSBlob = NULL;
 
 	// Voxel vertex shader
-	hr = CompileShaderFromFile(L"voxel.fx", "VS", "vs_4_0", &pVSBlob);
+	hr = CompileShaderFromFile(L"voxel.fx", "VS", "vs_5_0", &pVSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -412,7 +412,7 @@ HRESULT InitDevice()
 	}
 
 	// Voxel geometry shader
-	hr = CompileShaderFromFile(L"voxel.fx", "GS", "gs_4_0", &pGSBlob);
+	hr = CompileShaderFromFile(L"voxel.fx", "GS", "gs_5_0", &pGSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -425,7 +425,7 @@ HRESULT InitDevice()
 		return hr;
 	
 	// Voxel pixel shader
-	hr = CompileShaderFromFile(L"voxel.fx", "PS", "ps_4_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"voxel.fx", "PS", "ps_5_0", &pPSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -439,7 +439,7 @@ HRESULT InitDevice()
 
 	// Scene vertex shader
 	pVSBlob = NULL;
-	hr = CompileShaderFromFile(L"shader.fx", "VS", "vs_4_0", &pVSBlob);
+	hr = CompileShaderFromFile(L"shader.fx", "VS", "vs_5_0", &pVSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -469,7 +469,7 @@ HRESULT InitDevice()
 
 	// Cloud pixel shader
 	pPSBlob = NULL;
-	hr = CompileShaderFromFile(L"shader.fx", "PScloud", "ps_4_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"shader.fx", "PScloud", "ps_5_0", &pPSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -483,7 +483,7 @@ HRESULT InitDevice()
 
 	// Skybox pixel shader
 	pPSBlob = NULL;
-	hr = CompileShaderFromFile(L"shader.fx", "PSsky", "ps_4_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"shader.fx", "PSsky", "ps_5_0", &pPSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -497,7 +497,7 @@ HRESULT InitDevice()
 
 	// Screen vertex shader
 	pVSBlob = NULL;
-	hr = CompileShaderFromFile(L"shader.fx", "VS_screen", "vs_4_0", &pVSBlob);
+	hr = CompileShaderFromFile(L"shader.fx", "VS_screen", "vs_5_0", &pVSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -513,7 +513,7 @@ HRESULT InitDevice()
 
 	// Screen pixel shader
 	pPSBlob = NULL;
-	hr = CompileShaderFromFile(L"shader.fx", "PS_screen", "ps_4_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"shader.fx", "PS_screen", "ps_5_0", &pPSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -527,7 +527,7 @@ HRESULT InitDevice()
 
 	// Bloom vertex shader
 	pPSBlob = NULL;
-	hr = CompileShaderFromFile(L"bloomshader.fx", "VS", "vs_4_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"bloomshader.fx", "VS", "vs_5_0", &pPSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -541,7 +541,7 @@ HRESULT InitDevice()
 
 	// Bloom pixel shader
 	pPSBlob = NULL;
-	hr = CompileShaderFromFile(L"bloomshader.fx", "PS_bloom", "ps_4_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"bloomshader.fx", "PS_bloom", "ps_5_0", &pPSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -555,7 +555,7 @@ HRESULT InitDevice()
 
 	// Bright pass pixel shader
 	pPSBlob = NULL;
-	hr = CompileShaderFromFile(L"bloomshader.fx", "PS_bright", "ps_4_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"bloomshader.fx", "PS_bright", "ps_5_0", &pPSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -569,7 +569,7 @@ HRESULT InitDevice()
 
 	// Volumetric lighting vertex shader
 	pPSBlob = NULL;
-	hr = CompileShaderFromFile(L"vlshader.fx", "VS", "vs_4_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"vlshader.fx", "VS", "vs_5_0", &pPSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -583,7 +583,7 @@ HRESULT InitDevice()
 
 	// Volumetric lighting pixel shader
 	pPSBlob = NULL;
-	hr = CompileShaderFromFile(L"vlshader.fx", "PS", "ps_4_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"vlshader.fx", "PS", "ps_5_0", &pPSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -597,7 +597,7 @@ HRESULT InitDevice()
 
 	// Shadow pass scene vertex shader
 	pPSBlob = NULL;
-	hr = CompileShaderFromFile(L"shadowshader.fx", "VS", "vs_4_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"shadowshader.fx", "VS", "vs_5_0", &pPSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -611,7 +611,7 @@ HRESULT InitDevice()
 
 	// Shadow pass scene pixel shader
 	pPSBlob = NULL;
-	hr = CompileShaderFromFile(L"shadowshader.fx", "PSscene", "ps_4_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"shadowshader.fx", "PSscene", "ps_5_0", &pPSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -625,7 +625,7 @@ HRESULT InitDevice()
 
 	// Shadow pass sun pixel shader
 	pPSBlob = NULL;
-	hr = CompileShaderFromFile(L"shadowshader.fx", "PSsun", "ps_4_0", &pPSBlob);
+	hr = CompileShaderFromFile(L"shadowshader.fx", "PSsun", "ps_5_0", &pPSBlob);
 	if (FAILED(hr))
 	{
 		MessageBox(NULL,
@@ -951,10 +951,10 @@ HRESULT InitDevice()
 	// Initialize the render target texture description.
 	ZeroMemory(&textureDesc, sizeof(textureDesc));
 	// Setup the render target texture description.
-	textureDesc.Width = 16384;
+	textureDesc.Width = MAXTEX1DSIZE;
 	textureDesc.MipLevels = 1;
 	textureDesc.ArraySize = 1;
-	textureDesc.Format = DXGI_FORMAT_R32_UINT;
+	textureDesc.Format = DXGI_FORMAT_R32_FLOAT;
 	textureDesc.Usage = D3D11_USAGE_STAGING;
 	textureDesc.BindFlags = 0;
 	textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
@@ -1377,7 +1377,7 @@ void Render_to_texture(long elapsed)
 	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
 	g_pImmediateContext->OMSetDepthStencilState(ds_off, 1);
 
-	for (int ii = 0; ii < smokeray.size(); ii++)
+	for (int ii = 0; ii < 1; ii++)
 	{
 		M = smokeray[ii]->get_matrix(view);
 		constantbuffer.World = XMMatrixTranspose(M);
@@ -2036,7 +2036,7 @@ void Render_to_3dtexture(long elapsed)
 
 	//REORDER THE BILLBOARDS, FURTHEST AWAY FIRST, CLOSEST LAST
 	//This can be optimized to be a lot faster, but W/E
-	bool swapped;
+	/*bool swapped;
 	billboard* temp;
 	do {
 		swapped = false;
@@ -2057,7 +2057,7 @@ void Render_to_3dtexture(long elapsed)
 				swapped = true;
 			}
 		}
-	} while (swapped);
+	} while (swapped);*/
 
 	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
@@ -2071,7 +2071,8 @@ void Render_to_3dtexture(long elapsed)
 	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
 	g_pImmediateContext->OMSetDepthStencilState(ds_off, 1);
 	
-	for (int ii = 0; ii < smokeray.size(); ii++)
+	smokeray[0]->position = XMFLOAT3(0, 0, 0);
+	for (int ii = 0; ii < 1; ii++)
 	{
 		worldmatrix = smokeray[ii]->get_matrix(view);
 
@@ -2320,7 +2321,31 @@ void update_constants()
 
 	g_pImmediateContext->Unmap(const_count.GetTexture1D(), 0);
 	}*/
+float arr[100];
+void debugCS()
+{
+	
+	//DEBUG!!!!!!!!!!!!!!!!!!!!!!!!!!
+	// Copy result
+	g_pImmediateContext->CopyResource(debugbuffer, VFL.GetTexture1D());
 
+
+	// Update particle system data with output from Compute Shader
+	D3D11_MAPPED_SUBRESOURCE mappedResource;
+	HRESULT hr = g_pImmediateContext->Map(debugbuffer, 0, D3D11_MAP_READ, 0, &mappedResource);
+	if (SUCCEEDED(hr))
+	{
+
+		float* dataView = reinterpret_cast<float*>(mappedResource.pData);
+
+		for (int ii = 0; ii < 100; ii++)
+			arr[ii] = dataView[ii];
+
+		g_pImmediateContext->Unmap(debugbuffer, 0);
+	}
+	int z;
+	z = 9;
+}
 void run_compute_shader(long elapsed)
 	{
 	 
@@ -2364,36 +2389,44 @@ void run_compute_shader(long elapsed)
 	*/
 
 	ConstantBufferCS constantbufferCS;
-	constantbufferCS.values = XMFLOAT4(0,0,0,0);
+	constantbufferCS.values = XMFLOAT4(1,0,0,0);
 	g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
 	g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
 
-	for (int i = 0; i < maxlevel; i++)			//maxlevel = 8
+	//start
+	g_pImmediateContext->CSSetShader(g_pStartingCS, NULL, 0);
+	g_pImmediateContext->Dispatch(1, 1, 1);
+
+	//flagging
+	g_pImmediateContext->CSSetShader(g_pFlaggingCS, NULL, 0);
+	g_pImmediateContext->Dispatch(1, 1, 1);
+
+	debugCS();
+
+	for (int i = 1; i < maxlevel; i++)			//maxlevel = 8
 	{
-		//update your constant buffer
-		constantbufferCS.values = XMFLOAT4((float)i+1.0f+EPS, 0, 0, 0);
+	
+		//passing the level
+		constantbufferCS.values = XMFLOAT4((float)i+EPS, 0, 0, 0);
 		g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
-		g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
+		g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);		
 
-		//run CSstart
-		//sets count[4] to 8
-		g_pImmediateContext->CSSetShader(g_pStartingCS, NULL, 0);
-		g_pImmediateContext->Dispatch(1, 1, 1);
-
-		//run CS(VFL, count[]);
-		//flag all the voxel nodes in the list into the Octree_RW array
-		//everytime you run: count[1] = previous index, and next index = count[2]
-		g_pImmediateContext->CSSetShader(g_pFlaggingCS, NULL, 0);
-		g_pImmediateContext->Dispatch(1, 1, 1);
-		
-		//run CS2(Octree_RW, count[1,2]);
-		//update_constants();		//updates after CS2
-								//updates after CS2
+		//building
 		g_pImmediateContext->CSSetShader(g_pBuildingCS, NULL, 0);
 		g_pImmediateContext->Dispatch(1, 1, 1);
 
-		/*g_pImmediateContext->CSSetShader(g_CSfake, NULL, 0);
-		g_pImmediateContext->Dispatch(NUM_THREADS, 1, 1);*/
+		//debugCS();
+
+		//passing the level + 1
+		constantbufferCS.values = XMFLOAT4((float)i + EPS + 1.0, 0, 0, 0);
+		g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
+		g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
+		
+		//flagging
+		g_pImmediateContext->CSSetShader(g_pFlaggingCS, NULL, 0);
+		g_pImmediateContext->Dispatch(1, 1, 1);	
+
+		//debugCS();
 		
 	}	
 
@@ -2401,30 +2434,7 @@ void run_compute_shader(long elapsed)
 
 
 
-	//DEBUG!!!!!!!!!!!!!!!!!!!!!!!!!!
-	// Copy result
-	g_pImmediateContext->CopyResource(debugbuffer, Octree_RW.GetTexture1D());
-
-
-	// Update particle system data with output from Compute Shader
-	D3D11_MAPPED_SUBRESOURCE mappedResource;
-	HRESULT hr = g_pImmediateContext->Map(debugbuffer, 0, D3D11_MAP_READ, 0, &mappedResource);
-
-
-	unsigned int arr[100];
-
-	if (SUCCEEDED(hr))
-	{
-
-		unsigned int* dataView = reinterpret_cast<unsigned int*>(mappedResource.pData);
-
-		for (int ii = 0; ii < 100; ii++)
-			arr[ii] = dataView[ii];
-
-		g_pImmediateContext->Unmap(debugbuffer, 0);
-	}
-	int z;
-	z = 9;
+	
 
 }
 

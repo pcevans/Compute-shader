@@ -114,14 +114,14 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 		if (voxel_to_work_on >= count[0]) break;
 
 		
-		/*float px = VFL[voxel_to_work_on * 3 + 0];
+		float px = VFL[voxel_to_work_on * 3 + 0];
 		float py = VFL[voxel_to_work_on * 3 + 1];
 		float pz = VFL[voxel_to_work_on * 3 + 2];
-		float3 pos = float3(px, py, pz);*/
+		float3 pos = float3(px, py, pz);
 
-		float3 pos = float3(7,7,7);
+		/*float3 pos = float3(7,7,7);
 		if (DTid.x ==1)
-			pos = float3(-7, 7, 7);
+			pos = float3(-7, 7, 7);*/
 		[allow_uav_condition]
 		for (int xlevel = 0; xlevel < currlevel; xlevel++)
 			{
