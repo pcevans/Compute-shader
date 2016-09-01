@@ -7,18 +7,56 @@
 #include <fstream>
 #include <vector>
 #include <time.h>
+#include <fstream>
+#include <io.h>
 #include "resource.h"
 #include "shaderheader.h"
-//using namespace std;
+#include <vector>
+using namespace std;
 
 #define EPS 0.00001
 
-struct SimpleVertex
+/*struct SimpleVertex
 {
 	XMFLOAT3 Pos;
 	XMFLOAT2 Tex;
 	XMFLOAT3 Normal;
+};*/
+
+
+
+
+float Vec3Length(const XMFLOAT3 &v);
+float Vec3Dot(XMFLOAT3 a, XMFLOAT3 b);
+XMFLOAT3 Vec3Cross(XMFLOAT3 a, XMFLOAT3 b);
+XMFLOAT3 Vec3Normalize(const  XMFLOAT3 &a);
+XMFLOAT3 operator+(const XMFLOAT3 lhs, const XMFLOAT3 rhs);
+XMFLOAT3 operator*(const XMFLOAT3 lhs, const float rhs);
+XMFLOAT3 operator-(const XMFLOAT3 lhs, const XMFLOAT3 rhs);
+bool Load(char *filename, ID3D11Device* g_pd3dDevice, ID3D11Buffer **ppVertexBuffer, int *vertex_count,float scale = 1.0);
+
+
+class SimpleVertex
+{
+public:
+	XMFLOAT3 Pos;
+	XMFLOAT2 Tex;
+	XMFLOAT3 Normal;
+	XMFLOAT3 Tangent;
+	XMFLOAT3 BiNormal;
+	SimpleVertex()
+	{
+		Pos = Normal = Tangent = BiNormal = XMFLOAT3(0, 0, 0);
+		Tex = XMFLOAT2(0, 0);
+	}
+	void load(XMFLOAT3 p, XMFLOAT2 tuv, XMFLOAT3 n)
+	{
+		Pos = p;
+		Tex = tuv;
+		Normal = n;
+	}
 };
+
 
 class ConstantBuffer
 {
@@ -70,7 +108,7 @@ public:
 
 	long double elapse_milli()
 	{
-		elapse_micro() / 1000.;
+		return elapse_micro() / 1000.;
 	}
 
 	void start()
@@ -147,7 +185,7 @@ public:
 		u = XMVector3TransformCoord(u, Rx*Ry);
 		XMStoreFloat3(&up, u);
 
-		float speed = elapsed_microseconds / 10000.0;
+		float speed = elapsed_microseconds / 10000.0f;
 
 		if (w)
 		{
@@ -194,10 +232,6 @@ public:
 		XMFLOAT3 unit_normal;
 		XMMATRIX RY, RXZ, T;
 
-		int x, y, z;
-
-		//if (rotation.x >= (XM_PI/2) - 0.5) rotation.x = ((XM_PI/2) - 0.5);
-		//if (rotation.x <= (-XM_PI/2) + 0.5) rotation.x = ((-XM_PI/2) + 0.5);
 		if (rotation.x >= (XM_PI / 2)) rotation.x = ((XM_PI / 2));
 		if (rotation.x <= (-XM_PI / 2)) rotation.x = ((-XM_PI / 2));
 
@@ -231,109 +265,20 @@ public:
 	{
 		vbuffer = NULL;
 		size = vxarea;
-		anz = pow(size,3);
+		anz = (int)pow(size,3);
 		v = new SimpleVertex[anz];
 		for (int xx = 0; xx < size; xx++)
 			for (int yy = 0; yy < size; yy++)
 				for (int zz = 0; zz < size; zz++)
 				{
-					v[xx + yy * size + zz * size * size].Pos.x = xx;
-					v[xx + yy * size + zz * size * size].Pos.y = yy;
-					v[xx + yy * size + zz * size * size].Pos.z = zz;
+					v[xx + yy * size + zz * size * size].Pos.x = (float)xx;
+					v[xx + yy * size + zz * size * size].Pos.y = (float)yy;
+					v[xx + yy * size + zz * size * size].Pos.z = (float)zz;
 				}
 	}
 
 	~voxel_()
 	{
 		delete[] v;
-	}
-};
-
-/////////////////////////////////
-class octree
-{
-public:
-	float* octray;
-	int octdex;
-	int size;
-
-	octree()
-	{
-		int level = 1;
-		int numnodes = (8 ^ (level + 1) - 1) / 7;
-		octray = new float[numnodes];
-		octray[0] = 1;
-		for (int i = 1; i < 9; i++) 
-			octray[i] = -1;
-		octdex = 9;
-	}
-	
-	//buildOctree(1,1,XMFLOAT3(0,0,0),arrlen,arr);
-	//precondition: all points inside octree area
-	int buildOctree(int index, int level, XMFLOAT3 midpt, int arrlen, XMFLOAT3 *arr)
-	{
-
-		XMFLOAT3 *subarr[8];
-		int subarrlen[8] = { 0 };
-
-		for (int i = 0; i < 8; i++) {
-			subarr[i] = new XMFLOAT3[1000];
-		}
-		
-		for (int i = 0; i < arrlen; i++) {
-			int idx = -1;
-			if (arr[i].x < midpt.x) {
-				if (arr[i].y < midpt.y) {
-					if (arr[i].z < midpt.z) idx = 0;
-					else idx = 6;
-				}
-				else {
-					if (arr[i].z < midpt.z) idx = 2;
-					else idx = 4;
-				}
-			}
-			else {
-				if (arr[i].y < midpt.y) {
-					if (arr[i].z < midpt.z) idx = 1;
-					else idx = 7;
-				}
-				else {
-					if (arr[i].z < midpt.z) idx = 3;
-					else idx = 5;
-				}
-			}
-			subarr[idx][subarrlen[idx]] = arr[i];
-			subarrlen[idx]++;
-		}
-		
-		for (int i = 0; i < 8; i++) {
-			if (subarrlen[i] != 0) {
-				if (level == 8) {
-					octray[index + i] = 0;
-				}
-				else {
-					octray[index + i] = octdex;
-					octdex += 8;
-
-					float octlevel = (size / pow(2, level)) / 2;
-					XMFLOAT3 octmid = midpt;
-
-					if (i % 2 == 0) octmid.x -= octlevel;
-					else octmid.x += octlevel;
-
-					if (i < 4) octmid.z -= octlevel;
-					else octmid.z += octlevel;
-
-					if (i < 6 && i > 1) octmid.y += octlevel;
-					else octmid.y -= octlevel;
-
-					buildOctree(octdex - 8, level + 1, octmid, subarrlen[i], subarr[i]);
-				}
-			}
-			else
-				octray[index + i] = -1;
-		}
-
-		return 1;
 	}
 };

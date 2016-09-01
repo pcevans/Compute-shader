@@ -1,17 +1,15 @@
 //--------------------------------------------------------------------------------------
 // File: lecture 8.cpp
 //
-// Clouds, voxels, and octres
+// Clouds, voxels, and octrees
 //
 //--------------------------------------------------------------------------------------
 
 #include "render_to_texture.h"
 //#include "shaderheader.h"
 #include <fstream>
-unsigned int put_in_octree(XMFLOAT3 pos);
-void start_octree();
-void put_in_octree_fake(int id, float level);
-void build_octree(int id, int level);
+
+void debugCS();
 //--------------------------------------------------------------------------------------
 // Global Variables
 //--------------------------------------------------------------------------------------
@@ -28,6 +26,7 @@ ID3D11DepthStencilView*             g_pDepthStencilView = NULL;
 ID3D11RasterizerState*				g_pRasterState = NULL;
 
 ID3D11ShaderResourceView*           g_pTextureSun = NULL;
+ID3D11ShaderResourceView*           g_pTextureBricks = NULL;
 
 RenderTextureClass					RenderToTexture;
 RenderTextureClass					LightSourcePass;
@@ -40,6 +39,14 @@ RenderTextureClass					Octree_RW;
 RenderTextureClass					VFL;
 RenderTextureClass					const_count;
 
+ID3D11Buffer*						Octree_RW2; 
+ID3D11Buffer*						VFL2; 
+ID3D11Buffer*						const_count2; 
+ID3D11UnorderedAccessView*			Octree_UAV;
+ID3D11ShaderResourceView*			Octree_SRV; 
+ID3D11UnorderedAccessView*			VFL_UAV;
+ID3D11UnorderedAccessView*			count_UAV; 
+
 ID3D11VertexShader*                 g_pScreenVS = NULL;
 ID3D11PixelShader*                  g_pScreenPS = NULL;
 
@@ -48,14 +55,16 @@ ID3D11PixelShader*                  g_pCloudPS = NULL;
 
 ID3D11VertexShader*                 g_pVertexShader = NULL;
 ID3D11PixelShader*                  g_pPixelShader = NULL;
+ID3D11PixelShader*                  PSsponza = NULL;
 
 ID3D11VertexShader*                 g_pEffectVS = NULL;
 ID3D11PixelShader*                  g_pEffectPS = NULL;
 
-ID3D11ComputeShader*                g_pStartingCS = NULL;	//NEW
-ID3D11ComputeShader*                g_pFlaggingCS = NULL;	//NEW
-ID3D11ComputeShader*                g_pBuildingCS = NULL;	//NEW
-ID3D11ComputeShader*                g_CSfake = NULL;	//NEW
+ID3D11ComputeShader*                g_pStartingCS = NULL;
+ID3D11ComputeShader*                g_pFlaggingCS = NULL;
+ID3D11ComputeShader*                g_pBuildingCS = NULL;
+ID3D11ComputeShader*                g_pFakeCS = NULL;
+ID3D11ComputeShader*				g_pClearCS = NULL;
 
 ID3D11VertexShader*                 g_pShadowVS = NULL;
 ID3D11PixelShader*                  g_pShadowPS = NULL;
@@ -74,6 +83,8 @@ ID3D11InputLayout*                  g_pVertexLayout = NULL;
 ID3D11Buffer*                       g_pVertexBuffer = NULL;
 ID3D11Buffer*                       g_pVertexBuffer_sky = NULL;
 ID3D11Buffer*                       g_pVertexBuffer_screen = NULL;
+ID3D11Buffer*                       g_pVertexBuffer_3ds = NULL;
+int									vertex_count_3ds;
 int									vertex_count;
 
 //states for turning off and on the depth buffer
@@ -88,7 +99,9 @@ ID3D11ShaderResourceView*           g_pTextureRV = NULL;
 ID3D11ShaderResourceView*           g_pSkyboxTex = NULL; //skybox
 ID3D11ShaderResourceView*           normaltex = NULL;
 
-ID3D11Texture1D*					debugbuffer;
+ID3D11Buffer*						debugbuffer_VFL;
+ID3D11Buffer*						debugbuffer_Octree;
+ID3D11Buffer*						debugbuffer_count;
 
 ID3D11SamplerState*                 g_pSamplerLinear = NULL;
 
@@ -111,7 +124,7 @@ float								offsetx = 2;
 float								offsety = 0;
 float								offsetz = 2;
 bool                                madeClouds = false;
-int									octree_count[5];
+int									octree_count[6];
 
 #define ROCKETRADIUS				10
 
@@ -145,38 +158,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 		return 0;
 	}
 	srand(time(0));
-	
-	for (int i = 0; i < 5; i++) {
-		octree_count[i] = 0;
-	}
-
-	for (int i = 0; i < 100; i++) 
-	{
-		GIarr[i] = 0;
-	}
-	
-	std::ofstream tfile;
-	tfile.open("test.txt");
-
-	octree_count[0] = 1;
-	start_octree();
-	for (int j = 0; j < maxlevel; j++)
-	{
-		for (int i = 0; i < 512; i++)
-		{
-			put_in_octree_fake(i, (float)j + 1.0f + EPS);
-		}
-
-		for (int i = 0; i < 512; i++)
-		{
-			build_octree(i, (float)j + 1.0f + EPS);
-		}
-	}
-	//put_in_octree(XMFLOAT3(.1, .1, .1));
-
-	for (int i = 0; i < 100; i++) {
-		tfile << "Octree_RW[" << i << "] = " << GIarr[i] << ";\n";
-	}
 
 	sun.position.x = 0;
 	sun.position.y = 0;
@@ -467,6 +448,24 @@ HRESULT InitDevice()
 	if (FAILED(hr))
 		return hr;
 
+
+	//sponza:
+
+	
+	pPSBlob = NULL;
+	hr = CompileShaderFromFile(L"shader.fx", "PSsponza", "ps_5_0", &pPSBlob);
+	if (FAILED(hr))
+	{
+		MessageBox(NULL,
+			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
+		return hr;
+	}
+	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &PSsponza);
+	pPSBlob->Release();
+	if (FAILED(hr))
+		return hr;
+
+
 	// Cloud pixel shader
 	pPSBlob = NULL;
 	hr = CompileShaderFromFile(L"shader.fx", "PScloud", "ps_5_0", &pPSBlob);
@@ -679,6 +678,7 @@ HRESULT InitDevice()
 	if (FAILED(hr))
 		return hr;
 
+	// Compute shader for faking things
 	pPSBlob = NULL;
 	hr = CompileShaderFromFile(L"compute.fx", "CSfake", "cs_5_0", &pPSBlob);
 	if (FAILED(hr))
@@ -687,7 +687,21 @@ HRESULT InitDevice()
 			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
 		return hr;
 	}
-	hr = g_pd3dDevice->CreateComputeShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_CSfake);
+	hr = g_pd3dDevice->CreateComputeShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pFakeCS);
+	pPSBlob->Release();
+	if (FAILED(hr))
+		return hr;
+
+	// Compute shader for clearing UAVs
+	pPSBlob = NULL;
+	hr = CompileShaderFromFile(L"compute.fx", "CSclear", "cs_5_0", &pPSBlob);
+	if (FAILED(hr))
+	{
+		MessageBox(NULL,
+			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
+		return hr;
+	}
+	hr = g_pd3dDevice->CreateComputeShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pClearCS);
 	pPSBlob->Release();
 	if (FAILED(hr))
 		return hr;
@@ -700,6 +714,8 @@ HRESULT InitDevice()
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 32, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 44, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
 	UINT numElements = ARRAYSIZE(layout);
 
@@ -718,15 +734,21 @@ HRESULT InitDevice()
 	LoadCatmullClark(L"ccsphere.cmp", g_pd3dDevice, &g_pVertexBuffer_sky, &vertex_count);
 
 	// Create screen vertex buffer
-	SimpleVertex vertices_screen[] =
-	{
+	SimpleVertex vertices_screen[6];
+	vertices_screen[0].load(XMFLOAT3(-1.0f, 1.0f, 0.0f), XMFLOAT2(0, 0), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices_screen[1].load(XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1, 0), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices_screen[2].load(XMFLOAT3(-1.0f, -1.0f, 0.0f), XMFLOAT2(0, 1), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices_screen[3].load(XMFLOAT3(-1.0f, -1.0f, 0.0f), XMFLOAT2(0, 1), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices_screen[4].load(XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1, 0), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices_screen[5].load(XMFLOAT3(1.0f, -1.0f, 0.0f), XMFLOAT2(1, 1), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	/*	{
 		{ XMFLOAT3(-1.0f, 1.0f, 0.0f), XMFLOAT2(0,0) ,XMFLOAT3(0.0f, 0.0f, 1.0f), },
 		{ XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1,0) ,XMFLOAT3(0.0f, 0.0f, 1.0f), },
 		{ XMFLOAT3(-1.0f, -1.0f, 0.0f), XMFLOAT2(0,1) ,XMFLOAT3(0.0f, 0.0f, 1.0f), },
 		{ XMFLOAT3(-1.0f, -1.0f, 0.0f), XMFLOAT2(0,1) ,XMFLOAT3(0.0f, 0.0f, 1.0f), },
 		{ XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1,0) ,XMFLOAT3(0.0f, 0.0f, 1.0f), },
 		{ XMFLOAT3(1.0f, -1.0f, 0.0f), XMFLOAT2(1,1) ,XMFLOAT3(0.0f, 0.0f, 1.0f), },
-	};
+		};	*/
 
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
@@ -742,7 +764,22 @@ HRESULT InitDevice()
 		return hr;
 
 	// Create double sided square vertex buffer
-	SimpleVertex vertices[] =
+	SimpleVertex vertices[12];
+	vertices[0].load(XMFLOAT3(-1.0f, -1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices[1].load(XMFLOAT3(1.0f, -1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices[2].load(XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices[3].load(XMFLOAT3(-1.0f, -1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices[4].load(XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices[5].load(XMFLOAT3(-1.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+
+	vertices[6].load(XMFLOAT3(1.0f, -1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices[7].load(XMFLOAT3(-1.0f, -1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices[8].load(XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices[9].load(XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices[10].load(XMFLOAT3(-1.0f, -1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	vertices[11].load(XMFLOAT3(-1.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 0.0f), XMFLOAT3(0.0f, 0.0f, 1.0f));
+	
+	/*SimpleVertex vertices[] =
 	{
 		{ XMFLOAT3(-1.0f, -1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) ,XMFLOAT3(0.0f, 0.0f, 1.0f) },
 		{ XMFLOAT3(1.0f, -1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) ,XMFLOAT3(0.0f, 0.0f, 1.0f) },
@@ -757,7 +794,7 @@ HRESULT InitDevice()
 		{ XMFLOAT3(1.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) ,XMFLOAT3(0.0f, 0.0f, 1.0f) },
 		{ XMFLOAT3(-1.0f, -1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) ,XMFLOAT3(0.0f, 0.0f, 1.0f) },
 		{ XMFLOAT3(-1.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 0.0f),XMFLOAT3(0.0f, 0.0f, 1.0f) }
-	};
+	};*/
 
 	ZeroMemory(&bd, sizeof(bd));
 	bd.Usage = D3D11_USAGE_DEFAULT;
@@ -781,6 +818,10 @@ HRESULT InitDevice()
 	hr = g_pd3dDevice->CreateBuffer(&bd, &InitData, &voxel.vbuffer);
 	if (FAILED(hr))
 		return hr;
+
+	//load 3ds here????
+	Load("sponza1.3DS", g_pd3dDevice, &g_pVertexBuffer_3ds, &vertex_count_3ds,0.3);
+
 
 	// Set vertex buffer
 	UINT stride = sizeof(SimpleVertex);
@@ -808,8 +849,6 @@ HRESULT InitDevice()
 	if (FAILED(hr))
 		return hr;
 
-
-
 	// Load skybox texture
 	hr = D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice, L"skybox3.png", NULL, NULL, &g_pSkyboxTex, NULL);
 	if (FAILED(hr))
@@ -819,6 +858,13 @@ HRESULT InitDevice()
 	hr = D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice, L"smoke.dds", NULL, NULL, &g_pTextureRV, NULL);
 	if (FAILED(hr))
 		return hr;
+	// Load brikcs texture
+	hr = D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice, L"bricks.jpg", NULL, NULL, &g_pTextureBricks, NULL);
+	if (FAILED(hr))
+		return hr;
+
+
+	
 
 	// Load cloud normal map texture
 	hr = D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice, L"smoke_NormalMap.png", NULL, NULL, &normaltex, NULL);
@@ -843,11 +889,6 @@ HRESULT InitDevice()
 	hr = g_pd3dDevice->CreateSamplerState(&sampDesc, &g_pSamplerLinear);
 	if (FAILED(hr))
 		return hr;
-
-
-
-
-
 
 	// Initialize the world matrices
 	g_World = XMMatrixIdentity();
@@ -936,22 +977,21 @@ HRESULT InitDevice()
 	// RenderTarget textures
 	RenderToTexture.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, TRUE);
 	Voxel_GI.Initialize_3DTex(g_pd3dDevice, 512, 512, 512, TRUE, DXGI_FORMAT_R8G8B8A8_UNORM, TRUE);
-	
-
-
-
-
 	Octree_RW.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
+	VFL.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32_FLOAT, TRUE);
+	const_count.Initialize_1DTex(g_pd3dDevice, g_hWnd, 6, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
+	LightSourcePass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
+	VolumetricPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
+	BrightPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
+	BloomPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
+
 	//staging texture for write back
-	D3D11_TEXTURE1D_DESC textureDesc;
-	HRESULT result;
-	D3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc;
-	D3D11_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc;
+	/*D3D11_TEXTURE1D_DESC textureDesc;
 
 	// Initialize the render target texture description.
 	ZeroMemory(&textureDesc, sizeof(textureDesc));
 	// Setup the render target texture description.
-	textureDesc.Width = MAXTEX1DSIZE;
+	textureDesc.Width = MAXTEX1DSIZE; 
 	textureDesc.MipLevels = 1;
 	textureDesc.ArraySize = 1;
 	textureDesc.Format = DXGI_FORMAT_R32_FLOAT;
@@ -960,24 +1000,154 @@ HRESULT InitDevice()
 	textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
 	textureDesc.MiscFlags = 0;
 
-	result = g_pd3dDevice->CreateTexture1D(&textureDesc, NULL, &debugbuffer);
-	if (FAILED(result))
+	hr = g_pd3dDevice->CreateTexture1D(&textureDesc, NULL, &debugbuffer);
+	if (FAILED(hr))
+	{
+		return false;
+	}*/
+
+	//////////////////////////////////////////// NEW BUFFERS !!!!!!!!!! NEW NEW NEW NEW
+	
+	// Initialize RW buffer and UAV for VFL
+	D3D11_BUFFER_DESC bufferDesc;
+	ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+	bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+	bufferDesc.ByteWidth = sizeof(XMFLOAT3) * BUFFERSIZE;
+	bufferDesc.StructureByteStride = sizeof(XMFLOAT3);
+	bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	hr = g_pd3dDevice->CreateBuffer(&bufferDesc, NULL, &VFL2);
+	if (FAILED(hr))
+		return false;
+
+	D3D11_BUFFER_UAV bufferUAV;
+	ZeroMemory(&bufferUAV, sizeof(bufferUAV));
+	bufferUAV.FirstElement = 0;
+	bufferUAV.NumElements = BUFFERSIZE;
+	bufferUAV.Flags = D3D11_BUFFER_UAV_FLAG_COUNTER; //D3D11_BUFFER_UAV_FLAG_APPEND or D3D11_BUFFER_UAV_FLAG_COUNTER
+
+	D3D11_UNORDERED_ACCESS_VIEW_DESC descUAV;
+	ZeroMemory(&descUAV, sizeof(descUAV));
+	descUAV.Format = DXGI_FORMAT_UNKNOWN;
+	descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+	descUAV.Buffer = bufferUAV;
+	hr = g_pd3dDevice->CreateUnorderedAccessView(VFL2, &descUAV, &VFL_UAV);
+	if (FAILED(hr))
+		return false;
+
+	// Initialize RW buffer and UAV for octree
+	ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+	bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+	bufferDesc.ByteWidth = sizeof(unsigned int) * BUFFERSIZE;
+	bufferDesc.StructureByteStride = sizeof(unsigned int);
+	bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	hr = g_pd3dDevice->CreateBuffer(&bufferDesc, NULL, &Octree_RW2);
+	if (FAILED(hr))
+		return false;
+
+	ZeroMemory(&bufferUAV, sizeof(bufferUAV));
+	bufferUAV.FirstElement = 0;
+	bufferUAV.NumElements = BUFFERSIZE;
+	bufferUAV.Flags = D3D11_BUFFER_UAV_FLAG_COUNTER; //D3D11_BUFFER_UAV_FLAG_APPEND or D3D11_BUFFER_UAV_FLAG_COUNTER
+
+	ZeroMemory(&descUAV, sizeof(descUAV));
+	descUAV.Format = DXGI_FORMAT_UNKNOWN;
+	descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+	descUAV.Buffer = bufferUAV;
+	hr = g_pd3dDevice->CreateUnorderedAccessView(Octree_RW2, &descUAV, &Octree_UAV);
+	if (FAILED(hr))
+		return false;
+
+	D3D11_BUFFER_SRV bufferSRV;
+	ZeroMemory(&bufferSRV, sizeof(bufferSRV));
+	bufferSRV.FirstElement = 0;
+	bufferSRV.NumElements = BUFFERSIZE;
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC descSRV;
+	ZeroMemory(&descSRV, sizeof(descSRV));
+	descSRV.Buffer = bufferSRV;
+	descSRV.Format = DXGI_FORMAT_UNKNOWN;
+	descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+	hr = g_pd3dDevice->CreateShaderResourceView(Octree_RW2, &descSRV, &Octree_SRV);
+	if (FAILED(hr))
+		return false;
+
+	// Initialize RW buffer and UAV for count
+	ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+	bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+	bufferDesc.ByteWidth = sizeof(unsigned int) * 6;
+	bufferDesc.StructureByteStride = sizeof(unsigned int);
+	bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	hr = g_pd3dDevice->CreateBuffer(&bufferDesc, NULL, &const_count2);
+	if (FAILED(hr))
+		return false;
+
+	ZeroMemory(&bufferUAV, sizeof(bufferUAV));
+	bufferUAV.FirstElement = 0;
+	bufferUAV.NumElements = 6;
+	bufferUAV.Flags = D3D11_BUFFER_UAV_FLAG_COUNTER; //D3D11_BUFFER_UAV_FLAG_APPEND or D3D11_BUFFER_UAV_FLAG_COUNTER
+
+	ZeroMemory(&descUAV, sizeof(descUAV));
+	descUAV.Format = DXGI_FORMAT_UNKNOWN;
+	descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+	descUAV.Buffer = bufferUAV;
+	hr = g_pd3dDevice->CreateUnorderedAccessView(const_count2, &descUAV, &count_UAV);
+	if (FAILED(hr))
+		return false;
+	
+	//////////////////////////////////////////// NEW BUFFERS !!!!!!!!!! NEW STAGING BUFFERS !!!!!!!!!!! NEW NEW NEW NEW
+
+	// VFL staging buffer
+	ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+	bufferDesc.BindFlags = 0;
+	bufferDesc.ByteWidth = sizeof(XMFLOAT3) * BUFFERSIZE;
+	bufferDesc.StructureByteStride = sizeof(XMFLOAT3);
+	bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	bufferDesc.Usage = D3D11_USAGE_STAGING;
+	bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+
+	hr = g_pd3dDevice->CreateBuffer(&bufferDesc, NULL, &debugbuffer_VFL);
+	if (FAILED(hr))
 	{
 		return false;
 	}
 
+	// Octree staging buffer
+	ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+	bufferDesc.BindFlags = 0;
+	bufferDesc.ByteWidth = sizeof(unsigned int) * BUFFERSIZE;
+	bufferDesc.StructureByteStride = sizeof(unsigned int);
+	bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	bufferDesc.Usage = D3D11_USAGE_STAGING;
+	bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
 
+	hr = g_pd3dDevice->CreateBuffer(&bufferDesc, NULL, &debugbuffer_Octree);
+	if (FAILED(hr))
+	{
+		return false;
+	}
 
+	// count staging buffer
+	ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+	bufferDesc.BindFlags = 0;
+	bufferDesc.ByteWidth = sizeof(unsigned int) * 6;
+	bufferDesc.StructureByteStride = sizeof(unsigned int);
+	bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	bufferDesc.Usage = D3D11_USAGE_STAGING;
+	bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
 
+	hr = g_pd3dDevice->CreateBuffer(&bufferDesc, NULL, &debugbuffer_count);
+	if (FAILED(hr))
+	{
+		return false;
+	}
 
-
-	
-	VFL.Initialize_1DTex(g_pd3dDevice, g_hWnd, -1, TRUE, DXGI_FORMAT_R32_FLOAT, TRUE);
-	const_count.Initialize_1DTex(g_pd3dDevice, g_hWnd, 5, TRUE, DXGI_FORMAT_R32_UINT, TRUE);
-	LightSourcePass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
-	VolumetricPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
-	BrightPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
-	BloomPass.Initialize_2DTex(g_pd3dDevice, g_hWnd, -1, -1, FALSE, DXGI_FORMAT_R8G8B8A8_UNORM, FALSE);
+	//////////////////////////////////////////// NEW STAGING BUFFERS !!!!!!!!!!!
 
 	return S_OK;
 }
@@ -1362,7 +1532,7 @@ void Render_to_texture(long elapsed)
 
 	ID3D11ShaderResourceView* d3dtexture = Voxel_GI.GetShaderResourceView();
 	g_pImmediateContext->GenerateMips(d3dtexture);
-	ID3D11ShaderResourceView* octexture = Octree_RW.GetShaderResourceView();
+	ID3D11ShaderResourceView* octree = Octree_SRV;
 
 	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
@@ -1370,14 +1540,14 @@ void Render_to_texture(long elapsed)
 	g_pImmediateContext->PSSetShader(g_pCloudPS, NULL, 0);
 	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureRV);
 	g_pImmediateContext->PSSetShaderResources(3, 1, &d3dtexture);
-	g_pImmediateContext->PSSetShaderResources(6, 1, &octexture);
+	g_pImmediateContext->PSSetShaderResources(6, 1, &octree);
 	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
 	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
 
 	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
 	g_pImmediateContext->OMSetDepthStencilState(ds_off, 1);
 
-	for (int ii = 0; ii < 1; ii++)
+	/*for (int ii = 0; ii < 1; ii++)
 	{
 		M = smokeray[ii]->get_matrix(view);
 		constantbuffer.World = XMMatrixTranspose(M);
@@ -1386,133 +1556,24 @@ void Render_to_texture(long elapsed)
 		g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
 
 		g_pImmediateContext->Draw(12, 0);
-	}
+	}*/
+	//render sponza
 
-	// Render voxels
-	if (voxeldraw)
-	{
-		constantbuffer.World = XMMatrixTranspose(XMMatrixIdentity());
-		constantbuffer.View = XMMatrixTranspose(view);
-		constantbuffer.Projection = XMMatrixTranspose(g_Projection);
-		constantbuffer.info.x = 1;
-		g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
-
-		g_pImmediateContext->VSSetShader(g_pVoxelVS, NULL, 0);
-		g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
-
-		g_pImmediateContext->GSSetShader(g_pVoxelGS, NULL, 0);
-		g_pImmediateContext->GSSetShaderResources(0, 1, &d3dtexture);
-		g_pImmediateContext->GSSetShaderResources(1, 1, &octexture);
-		g_pImmediateContext->GSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->GSSetSamplers(0, 1, &g_pSamplerLinear);
-
-		g_pImmediateContext->PSSetShader(g_pVoxelPS, NULL, 0);
-		g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
-
-		g_pImmediateContext->IASetVertexBuffers(0, 1, &voxel.vbuffer, &stride, &offset);
-		g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-		g_pImmediateContext->OMSetDepthStencilState(ds_on, 1);
-
-		g_pImmediateContext->Draw(voxel.anz, 0);
-	}
-
-	g_pSwapChain->Present(0, 0);
-
-	ID3D11ShaderResourceView* srvs[D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = { 0 };
-	g_pImmediateContext->VSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
-	g_pImmediateContext->PSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
-	g_pImmediateContext->GSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
-}
-
-
-void Render_to_texture_test(long elapsed)
-{
-	float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // red, green, blue, alpha
-	ID3D11RenderTargetView*			RenderTarget;
-	RenderTarget = RenderToTexture.GetRenderTarget();
-
-	// Clear render target & shaders, set render target & primitive topology
-	g_pImmediateContext->ClearRenderTargetView(RenderTarget, ClearColor);
-	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0, 0);
-	g_pImmediateContext->OMSetRenderTargets(1, &RenderTarget, g_pDepthStencilView);
-	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	XMMATRIX view = cam.get_matrix(&g_View);
-	UINT stride = sizeof(SimpleVertex);
-	UINT offset = 0;
-
-	// Update constant buffer constants
-	ConstantBuffer constantbuffer;
-	constantbuffer.Projection = XMMatrixTranspose(g_Projection);
-	constantbuffer.CameraPos = XMFLOAT4(cam.position.x, cam.position.y, cam.position.z, 1);
-	XMMATRIX w = sun.get_matrix(view);
-	constantbuffer.SunPos = XMFLOAT4(w._41, w._42, w._43, 1);
-
-	// Sky sphere day and night cycle
-	static float f = 0.1;
-	f = f + 0.0001f;
-	f += elapsed / 10000000.0f;
-	constantbuffer.DayTimer.x = cos(f);
-
-	// Render skybox
-	XMMATRIX M, vv;
-	M = XMMatrixRotationY(0);
-	vv = view;
-	vv._41 = vv._42 = vv._43 = 0;
-	constantbuffer.World = XMMatrixTranspose(M);
-	constantbuffer.View = XMMatrixTranspose(vv);
-	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
-
-	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
-	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-
-	g_pImmediateContext->PSSetShader(g_pSkyPS, NULL, 0);
-	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->PSSetShaderResources(2, 1, &g_pSkyboxTex);
-	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
-
-	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer_sky, &stride, &offset);
-	g_pImmediateContext->OMSetDepthStencilState(ds_off, 1);
-
-	g_pImmediateContext->Draw(vertex_count, 0);
-
-	// Render clouds
-	M = XMMatrixIdentity();
-
-	ID3D11ShaderResourceView* d3dtexture = Voxel_GI.GetShaderResourceView();
-	g_pImmediateContext->GenerateMips(d3dtexture);
-	ID3D11ShaderResourceView* octexture = Octree_RW.GetShaderResourceView();
-
-	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
-	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-
-	g_pImmediateContext->PSSetShader(g_pCloudPS, NULL, 0);
-	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureRV);
-	g_pImmediateContext->PSSetShaderResources(3, 1, &d3dtexture);
-	g_pImmediateContext->PSSetShaderResources(6, 1, &octexture);
-	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
-
-	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
+	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureBricks);
+	//M = XMMatrixIdentity();
+	M = XMMatrixScaling(10, 10, 10) * XMMatrixRotationX(-XM_PIDIV2) * XMMatrixRotationY(XM_PIDIV2)*XMMatrixTranslation(0, -5, 0);
+	
+	g_pImmediateContext->PSSetShader(PSsponza, NULL, 0);
+	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer_3ds, &stride, &offset);
 	g_pImmediateContext->OMSetDepthStencilState(ds_on, 1);
 
-	//M = smokeray[ii]->get_matrix(view);
-	constantbuffer.World = XMMatrixTranspose(testcloud.get_matrix(view));
+	constantbuffer.World = XMMatrixTranspose(M);
 	constantbuffer.View = XMMatrixTranspose(view);
-	//constantbuffer.info = XMFLOAT4(smokeray[ii]->transparency, 1, 1, 1);
+	constantbuffer.info = XMFLOAT4(1, 1, 1, 1);
 	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
-
-	g_pImmediateContext->Draw(6, 0);
-
-	/*constantbuffer.World = XMMatrixTranspose(testcloud2.get_matrix(view));
-	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
-	g_pImmediateContext->Draw(12, 0);*/
-
+	g_pImmediateContext->Draw(vertex_count_3ds, 0);
+	
+	
 	// Render voxels
 	if (voxeldraw)
 	{
@@ -1528,7 +1589,7 @@ void Render_to_texture_test(long elapsed)
 
 		g_pImmediateContext->GSSetShader(g_pVoxelGS, NULL, 0);
 		g_pImmediateContext->GSSetShaderResources(0, 1, &d3dtexture);
-		g_pImmediateContext->GSSetShaderResources(1, 1, &octexture);
+		g_pImmediateContext->GSSetShaderResources(1, 1, &octree);
 		g_pImmediateContext->GSSetConstantBuffers(0, 1, &g_pCBuffer);
 		g_pImmediateContext->GSSetSamplers(0, 1, &g_pSamplerLinear);
 
@@ -1549,6 +1610,10 @@ void Render_to_texture_test(long elapsed)
 	g_pImmediateContext->VSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
 	g_pImmediateContext->PSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
 	g_pImmediateContext->GSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
+
+
+
+
 }
 
 /////Light vs. shadow mapping pass
@@ -1625,7 +1690,7 @@ void Render_to_texture2(long elapsed)
 	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
 	g_pImmediateContext->OMSetDepthStencilState(ds_off, 1);
 
-	for (int ii = 0; ii < smokeray.size(); ii++)
+	for (int ii = 0; ii < 1; ii++)
 	{
 		ConstantBuffer constantbuffer;
 		constantbuffer.info.x = 0;
@@ -1887,104 +1952,6 @@ void MakeClouds()
 	}
 }
 
-/*
-void Render_to_3dtexture(long elapsed)
-{
-	ID3D11RenderTargetView*			RenderTarget = RenderToTexture.GetRenderTarget();
-	ID3D11UnorderedAccessView *uav[8] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
-	uav[0] = Voxel_GI.GetUAV();
-	float ClearColorRT[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red, green, blue, alpha
-	float ClearColorUAV[4] = { 1,1,0,0 }; // red, green, blue, alpha
-
-	// Clear render target, UAV & shaders, set render target & primitive topology
-	g_pImmediateContext->ClearRenderTargetView(RenderTarget, ClearColorRT);
-	g_pImmediateContext->ClearUnorderedAccessViewFloat(uav[0], ClearColorUAV);
-	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0, 0);
-	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RenderTarget, 0, 1, 1, uav, 0);
-	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	XMMATRIX view = cam.get_matrix(&g_View);
-
-	UINT stride = sizeof(SimpleVertex);
-	UINT offset = 0;
-
-	// Update constant buffer
-	ConstantBuffer constantbuffer;
-	constantbuffer.View = XMMatrixTranspose(view);
-	constantbuffer.Projection = XMMatrixTranspose(g_Projection);
-	constantbuffer.CameraPos = XMFLOAT4(cam.position.x, cam.position.y, cam.position.z, 1);
-
-	XMMATRIX worldmatrix;
-	worldmatrix = XMMatrixIdentity();
-
-	if (!madeClouds)
-	{
-		for (int i = 0; i < numberOfClouds; i++)
-			MakeClouds();
-
-		madeClouds = true;
-
-	}
-
-	//REORDER THE BILLBOARDS, FURTHEST AWAY FIRST, CLOSEST LAST
-	//This can be optimized to be a lot faster, but W/E
-	bool swapped;
-	billboard* temp;
-	do {
-		swapped = false;
-		for (int i = 1; i < smokeray.size(); i++)
-		{
-			double dist1 = sqrt((-cam.position.x - smokeray[i - 1]->position.x) * (-cam.position.x - smokeray[i - 1]->position.x)
-				+ (-cam.position.y - smokeray[i - 1]->position.y) * (-cam.position.y - smokeray[i - 1]->position.y)
-				+ (-cam.position.z - smokeray[i - 1]->position.z) * (-cam.position.z - smokeray[i - 1]->position.z));
-
-			double dist2 = sqrt((-cam.position.x - smokeray[i]->position.x) * (-cam.position.x - smokeray[i]->position.x)
-				+ (-cam.position.y - smokeray[i]->position.y) * (-cam.position.y - smokeray[i]->position.y)
-				+ (-cam.position.z - smokeray[i]->position.z) * (-cam.position.z - smokeray[i]->position.z));
-
-			if (dist1 < dist2) {
-				temp = smokeray[i - 1];
-				smokeray[i - 1] = smokeray[i];
-				smokeray[i] = temp;
-				swapped = true;
-			}
-		}
-	} while (swapped);
-	
-	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
-	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->VSSetSamplers(0, 1, &SamplerScreen);
-
-	g_pImmediateContext->PSSetShader(g_pPixelShader, NULL, 0);
-	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureRV);
-	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
-
-	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
-	g_pImmediateContext->OMSetDepthStencilState(ds_off, 1);
-
-	for (int ii = 0; ii < smokeray.size(); ii++)
-	{
-		worldmatrix = smokeray[ii]->get_matrix(view);
-		constantbuffer.World = XMMatrixTranspose(worldmatrix);
-		constantbuffer.info = XMFLOAT4(smokeray[ii]->transparency, 1, 1, 1);
-		g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
-
-		g_pImmediateContext->Draw(12, 0);
-	}
-
-	g_pImmediateContext->OMSetDepthStencilState(ds_on, 1);
-	g_pSwapChain->Present(0, 0);
-
-	ID3D11RenderTargetView* RT;
-	RT = 0;
-	uav[0] = 0;
-	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RT, 0, 1, 1, uav, 0);
-
-}*/
 //############################################################################################################
 
 void Render_to_3dtexture(long elapsed)
@@ -1993,19 +1960,21 @@ void Render_to_3dtexture(long elapsed)
 	ID3D11UnorderedAccessView *uav[3] = { NULL, NULL, NULL };
 	
 	//uav[0] = Voxel_GI.GetUAV();
-	uav[0] = Octree_RW.GetUAV();
-	uav[1] = VFL.GetUAV();
-	uav[2] = const_count.GetUAV();
+	uav[0] = Octree_UAV;
+	uav[1] = VFL_UAV;
+	uav[2] = count_UAV;
+	//uav[3] = VFL_UAV; // NEW NEW NEW NEW
 	
 	float ClearColorRT[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red, green, blue, alpha
-	float ClearColorUAVfloat[1] = { 0.0f }; // one value
-	unsigned int ClearColorUAVint[1] = { 0 }; // one value
+	//float ClearColorUAVfloat[1] = { 0.0f }; // one value
+	//unsigned int ClearColorUAVint[1] = { 0 }; // one value
 
 	// Clear render target, UAV & shaders, set render target & primitive topology
 	g_pImmediateContext->ClearRenderTargetView(RenderTarget, ClearColorRT);
-	g_pImmediateContext->ClearUnorderedAccessViewUint(uav[0], ClearColorUAVint);
-	g_pImmediateContext->ClearUnorderedAccessViewFloat(uav[1], ClearColorUAVfloat);
-	g_pImmediateContext->ClearUnorderedAccessViewUint(uav[2], ClearColorUAVint);
+	//g_pImmediateContext->ClearUnorderedAccessViewUint(uav[0], ClearColorUAVint);
+	//g_pImmediateContext->ClearUnorderedAccessViewFloat(uav[1], ClearColorUAVfloat);
+	//g_pImmediateContext->ClearUnorderedAccessViewUint(uav[2], ClearColorUAVint);
+	//can't use a function to clear a structured buffer
 	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0, 0);
 	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RenderTarget, 0, 1, 3, uav, 0);
 	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
@@ -2071,7 +2040,7 @@ void Render_to_3dtexture(long elapsed)
 	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
 	g_pImmediateContext->OMSetDepthStencilState(ds_off, 1);
 	
-	smokeray[0]->position = XMFLOAT3(0, 0, 0);
+	/*smokeray[0]->position = XMFLOAT3(0, 0, 0);
 	for (int ii = 0; ii < 1; ii++)
 	{
 		worldmatrix = smokeray[ii]->get_matrix(view);
@@ -2081,91 +2050,38 @@ void Render_to_3dtexture(long elapsed)
 		g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
 
 		g_pImmediateContext->Draw(12, 0);
-	}
+	}*/
 
 	g_pImmediateContext->OMSetDepthStencilState(ds_on, 1);
-	g_pSwapChain->Present(0, 0);
 
-	ID3D11RenderTargetView* RT;
-	RT = 0;
-	uav[0] = 0;
-	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RT, 0, 1, 1, uav, 0);
-
-	ID3D11ShaderResourceView* srvs[D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = { 0 };
-	g_pImmediateContext->VSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
-	g_pImmediateContext->PSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
-
-}
-
-
-
-void Render_to_test(long elapsed)
-{
-	ID3D11RenderTargetView*			RenderTarget = RenderToTexture.GetRenderTarget();
-	ID3D11UnorderedAccessView *uav[2] = { NULL, NULL };
-
-	uav[0] = VFL.GetUAV();
-	float ClearColorRT[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red, green, blue, alpha
-														  //float ClearColorUAV[4] = { 0,0,0,0 }; // red, green, blue, alpha
-	unsigned int ClearColorUAVint[1] = { 0 }; // red
-
-											  // Clear render target, UAV & shaders, set render target & primitive topology
-	g_pImmediateContext->ClearRenderTargetView(RenderTarget, ClearColorRT);
-	g_pImmediateContext->ClearUnorderedAccessViewUint(uav[0], ClearColorUAVint);
-	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0, 0);
-	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RenderTarget, 0, 1, 1, uav, 0);
-	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	XMMATRIX view = cam.get_matrix(&g_View);
-	//XMMATRIX viewsub;
-
-	UINT stride = sizeof(SimpleVertex);
-	UINT offset = 0;
-
-	// Update constant buffer
-	ConstantBuffer constantbuffer;
-	constantbuffer.View = XMMatrixTranspose(view);
-	constantbuffer.Projection = XMMatrixTranspose(g_Projection);
-	constantbuffer.CameraPos = XMFLOAT4(cam.position.x, cam.position.y, cam.position.z, 1);
-
-	XMMATRIX worldmatrix;
-	worldmatrix = XMMatrixIdentity();
-
-	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
-	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
+	//g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureBricks);
+	//M = XMMatrixIdentity();
+	XMMATRIX M = XMMatrixScaling(10, 10, 10) * XMMatrixRotationX(-XM_PIDIV2) * XMMatrixRotationY(XM_PIDIV2)*XMMatrixTranslation(0, -5, 0);
 
 	g_pImmediateContext->PSSetShader(g_pPixelShader, NULL, 0);
-	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureRV);
-	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
-
-	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
-	g_pImmediateContext->OMSetDepthStencilState(ds_off, 1);
-
-	constantbuffer.World = XMMatrixTranspose(testcloud.get_matrix(view));
-	//constantbuffer.info = XMFLOAT4(smokeray[ii]->transparency, 1, 1, 1);
-	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
-	g_pImmediateContext->Draw(6, 0);
-
-	/*constantbuffer.World = XMMatrixTranspose(testcloud2.get_matrix(view));
-	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
-	g_pImmediateContext->Draw(12, 0);*/
-
+	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer_3ds, &stride, &offset);
 	g_pImmediateContext->OMSetDepthStencilState(ds_on, 1);
+
+	constantbuffer.World = XMMatrixTranspose(M);
+	constantbuffer.View = XMMatrixTranspose(view);
+	constantbuffer.info = XMFLOAT4(1, 1, 1, 1);
+	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
+	g_pImmediateContext->Draw(vertex_count_3ds, 0);
+
 	g_pSwapChain->Present(0, 0);
 
 	ID3D11RenderTargetView* RT;
 	RT = 0;
-	uav[0] = 0;
-	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RT, 0, 1, 1, uav, 0);
+	for(int i = 0; i < 3; i++)
+		uav[i] = 0;
+	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RT, 0, 1, 3, uav, 0);	
 
 	ID3D11ShaderResourceView* srvs[D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = { 0 };
 	g_pImmediateContext->VSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
 	g_pImmediateContext->PSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
+
+
+	debugCS();
 
 }
 
@@ -2292,7 +2208,7 @@ void Reset_CS()
 	ID3D11ShaderResourceView*	ppSRVsNULL[10] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 	ID3D11Buffer*				ppBuffsNULL[10] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 	UINT initCounts = 0;
-	int actualnum_uav = 3;//count of uav's = read/write stuff
+	int actualnum_uav = 4;//count of uav's = read/write stuff
 	int actualnum_srv = 1;//count of shader ressource view = txtures for input
 	int actualnum_buffs = 1;//count of constant buffer = what you get from the C++ side
 
@@ -2321,35 +2237,60 @@ void update_constants()
 
 	g_pImmediateContext->Unmap(const_count.GetTexture1D(), 0);
 	}*/
-float arr[100];
+
+XMFLOAT3 arr[BUFFERSIZE]; //VFL
+unsigned int arr2[BUFFERSIZE]; //Octree
+unsigned int arr3[6]; //count
 void debugCS()
 {
-	
-	//DEBUG!!!!!!!!!!!!!!!!!!!!!!!!!!
-	// Copy result
-	g_pImmediateContext->CopyResource(debugbuffer, VFL.GetTexture1D());
-
+	// Copy results
+	g_pImmediateContext->CopyResource(debugbuffer_VFL, VFL2);
+	g_pImmediateContext->CopyResource(debugbuffer_Octree, Octree_RW2);
+	g_pImmediateContext->CopyResource(debugbuffer_count, const_count2);
 
 	// Update particle system data with output from Compute Shader
 	D3D11_MAPPED_SUBRESOURCE mappedResource;
-	HRESULT hr = g_pImmediateContext->Map(debugbuffer, 0, D3D11_MAP_READ, 0, &mappedResource);
+	HRESULT hr = g_pImmediateContext->Map(debugbuffer_VFL, 0, D3D11_MAP_READ, 0, &mappedResource);
 	if (SUCCEEDED(hr))
 	{
 
-		float* dataView = reinterpret_cast<float*>(mappedResource.pData);
+		XMFLOAT3* dataView = reinterpret_cast<XMFLOAT3*>(mappedResource.pData);
 
-		for (int ii = 0; ii < 100; ii++)
+		for (int ii = 0; ii < BUFFERSIZE; ii++)
 			arr[ii] = dataView[ii];
 
-		g_pImmediateContext->Unmap(debugbuffer, 0);
+		g_pImmediateContext->Unmap(debugbuffer_VFL, 0);
+	}
+	hr = g_pImmediateContext->Map(debugbuffer_Octree, 0, D3D11_MAP_READ, 0, &mappedResource);
+	if (SUCCEEDED(hr))
+	{
+
+		unsigned int* dataView = reinterpret_cast<unsigned int*>(mappedResource.pData);
+
+		for (int ii = 0; ii < BUFFERSIZE; ii++)
+			arr2[ii] = dataView[ii];
+
+		g_pImmediateContext->Unmap(debugbuffer_Octree, 0);
+	}
+	hr = g_pImmediateContext->Map(debugbuffer_count, 0, D3D11_MAP_READ, 0, &mappedResource);
+	if (SUCCEEDED(hr))
+	{
+
+		unsigned int* dataView = reinterpret_cast<unsigned int*>(mappedResource.pData);
+
+		for (int ii = 0; ii < 6; ii++)
+			arr3[ii] = dataView[ii];
+
+		g_pImmediateContext->Unmap(debugbuffer_count, 0);
 	}
 	int z;
 	z = 9;
 }
+
 void run_compute_shader(long elapsed)
 	{
 	 
-	//resetting all from last iteration
+	// reset shader resource and unordered access views
 	ID3D11ShaderResourceView* pNullSRV = NULL;
 	ID3D11UnorderedAccessView* pNullUAV = NULL;
 	for(int ii = 0; ii < 8; ii++)
@@ -2361,46 +2302,33 @@ void run_compute_shader(long elapsed)
 	Reset_CS();
 
 	ID3D11UnorderedAccessView* uav[3] = { NULL, NULL, NULL };
-	uav[0] = Octree_RW.GetUAV();
-	uav[1] = VFL.GetUAV();
-	uav[2] = const_count.GetUAV();
+	unsigned int uavCounts[4] = {-1,-1,-1}; //has to be -1 for structured buffers
+	
+	uav[0] = Octree_UAV;
+	uav[1] = VFL_UAV;
+	uav[2] = count_UAV;
 
-	g_pImmediateContext->CSSetUnorderedAccessViews(1, 3, uav, NULL);
+	g_pImmediateContext->CSSetUnorderedAccessViews(1, 3, uav, uavCounts);
 
 	
-	//I do a lot of resetting = set things to NULL, I don't know it this all is necessary!!!!!
+	// reset shaders (if they are set)
 	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
 	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
-	
-	
+	g_pImmediateContext->GSSetShader(NULL, NULL, 0);	
 
-	//				SET YOUR READ/WRITE STUFF:
-	/*
-	int initCounts = 0;
-	ID3D11UnorderedAccessView *uav = Voxel_list.GetUAV(); //Voxel_list can be a texture class object and set to uav, you know the drill...
-	g_pImmediateContext->CSSetUnorderedAccessViews(0, 1, uav, &initCounts);
-	ID3D11ShaderResourceView* srv[3];
-	srv[0] = .. set here some texture aka input stuff, in this example I set 3 textures, can be more, can be less
-	srv[1] = 
-	srv[2] = 
-	g_pImmediateContext-
-	>CSSetShaderResources(0, 3, srv);
-	*/
-
+	// set up constant buffer
 	ConstantBufferCS constantbufferCS;
 	constantbufferCS.values = XMFLOAT4(1,0,0,0);
 	g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
 	g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
 
-	//start
+	// start
 	g_pImmediateContext->CSSetShader(g_pStartingCS, NULL, 0);
 	g_pImmediateContext->Dispatch(1, 1, 1);
 
-	//flagging
+	// flagging for first level
 	g_pImmediateContext->CSSetShader(g_pFlaggingCS, NULL, 0);
 	g_pImmediateContext->Dispatch(1, 1, 1);
-
 	debugCS();
 
 	for (int i = 1; i < maxlevel; i++)			//maxlevel = 8
@@ -2414,180 +2342,108 @@ void run_compute_shader(long elapsed)
 		//building
 		g_pImmediateContext->CSSetShader(g_pBuildingCS, NULL, 0);
 		g_pImmediateContext->Dispatch(1, 1, 1);
-
-		//debugCS();
+		debugCS();
 
 		//passing the level + 1
 		constantbufferCS.values = XMFLOAT4((float)i + EPS + 1.0, 0, 0, 0);
 		g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
 		g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
-		
+		//debugCS();
+
 		//flagging
 		g_pImmediateContext->CSSetShader(g_pFlaggingCS, NULL, 0);
-		g_pImmediateContext->Dispatch(1, 1, 1);	
+		g_pImmediateContext->Dispatch(1, 1, 1);			
 
-		//debugCS();
-		
+		debugCS();
 	}	
+
+	debugCS();
+
+	int z;
+	z = 0;
+	Reset_CS();
+
+}
+
+void clear_uavs(long elapsed)
+{
+
+	// reset shader resource and unordered access views
+	ID3D11ShaderResourceView* pNullSRV = NULL;
+	ID3D11UnorderedAccessView* pNullUAV = NULL;
+	for (int ii = 0; ii < 8; ii++)
+	{
+		g_pImmediateContext->CSSetShaderResources(ii, 1, &pNullSRV);
+		g_pImmediateContext->CSSetUnorderedAccessViews(ii, 1, &pNullUAV, NULL);
+	}
 
 	Reset_CS();
 
+	ID3D11UnorderedAccessView* uav[3] = { NULL, NULL, NULL };
+	unsigned int uavCounts[4] = { -1,-1,-1 }; //has to be -1 for structured buffers
+
+	uav[0] = Octree_UAV;
+	uav[1] = VFL_UAV;
+	uav[2] = count_UAV;
+
+	g_pImmediateContext->CSSetUnorderedAccessViews(1, 3, uav, uavCounts);
 
 
-	
+	// reset shaders (if they are set)
+	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
+	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
+	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
+
+	// set up constant buffer
+	ConstantBufferCS constantbufferCS;
+	constantbufferCS.values = XMFLOAT4(1, 0, 0, 0);
+	g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
+	g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
+
+	// clear uavs
+	g_pImmediateContext->CSSetShader(g_pClearCS, NULL, 0);
+	g_pImmediateContext->Dispatch(1, 1, 1);
+
+	debugCS();
+
+	int z;
+	z = 0;
+	Reset_CS();
 
 }
 
 void Render()
 {
-	static StopWatchMicro_ stopwatch;
+	static StopWatchMicro_ stopwatch; 
 	long elapsed = stopwatch.elapse_micro();
 	stopwatch.start(); //restart
 
+	debugCS();
+
 	cam.animation(elapsed);
+
+	stopwatch.start();
 	Render_to_3dtexture(elapsed);
-	//Render_to_test(elapsed);
+	elapsed = stopwatch.elapse_micro();
 
 	stopwatch.start(); //restart
 	run_compute_shader(elapsed);	//could be anywhere in the render pipeline //NEW NEW 
 	elapsed = stopwatch.elapse_micro();
 	
+	stopwatch.start();
 	Render_to_texture(elapsed);
-	//Render_to_texture_test(elapsed);
+	elapsed = stopwatch.elapse_micro();
+
+	stopwatch.start();
 	Render_to_texture2(elapsed);
+	elapsed = stopwatch.elapse_micro();
+
 	Render_to_texturebright(elapsed);	//bright
 	Render_to_texturebloom(elapsed);	//bloom
 	Render_to_texture3(elapsed);
 	Render_to_screen(elapsed);
+	
+	clear_uavs(elapsed);
+
+	debugCS();
 }
-
-void start_octree() {
-	octree_count[2] = 0;
-	octree_count[4] = 8;
-}
-
-void put_in_octree_fake(int id, float level)
-{
-	if (id == 0)
-	{
-		octree_count[1] = octree_count[2];	//updates after CS2
-		octree_count[2] = octree_count[4];	//updates after CS2
-
-	}
-
-	//how many passes do you need? We have DTid.x going from 0 to NUM_THREADS
-	float fnumpassesflag = ceil((float)octree_count[0] / (float)NUM_THREADS);
-	int numpassesflag = (int)fnumpassesflag;
-
-	unsigned int octdex = 0;
-	unsigned int currdex = 0;
-	int currlevel = (int)level;
-	XMFLOAT3 midpt = XMFLOAT3(0, 0, 0);
-	float midsize = vxarea / 4.;
-	unsigned int idx = 0;
-
-	if (id != 0)
-	{
-		return;
-	}
-
-	//go from 0 to count[0]
-	//[allow_uav_condition]
-	for (int i = 0; i < numpassesflag; i++)
-	{
-		unsigned int voxel_to_work_on = id + NUM_THREADS*i;
-		if (voxel_to_work_on >= octree_count[0]) break;
-
-
-		/*float px = VFL[voxel_to_work_on * 3 + 0];
-		float py = VFL[voxel_to_work_on * 3 + 1];
-		float pz = VFL[voxel_to_work_on * 3 + 2];
-		float3 pos = float3(px, py, pz);*/
-
-		XMFLOAT3 pos = XMFLOAT3(7,7,7);
-
-		//[allow_uav_condition]
-		for (int xlevel = 0; xlevel < currlevel; xlevel++)
-		{
-			if (pos.x < midpt.x)
-			{
-				if (pos.y < midpt.y)
-				{
-					if (pos.z < midpt.z) idx = 0;
-					else idx = 6;
-				}
-				else
-				{
-					if (pos.z < midpt.z) idx = 2;
-					else idx = 4;
-				}
-			}
-			else
-			{
-				if (pos.y < midpt.y)
-				{
-					if (pos.z < midpt.z) idx = 1;
-					else idx = 7;
-				}
-				else
-				{
-					if (pos.z < midpt.z) idx = 3;
-					else idx = 5;
-				}
-			}
-
-			currdex = octdex + idx;
-			octdex = GIarr[currdex];
-
-			if (idx % 2 == 0) midpt.x -= midsize;
-			else midpt.x += midsize;
-
-			if (idx < 4) midpt.z -= midsize;
-			else midpt.z += midsize;
-
-			if (idx < 6 && idx > 1) midpt.y += midsize;
-			else midpt.y -= midsize;
-
-			midsize = midsize / 2.;
-		}
-
-		GIarr[currdex] = 1;
-
-	}
-}
-
-
-void build_octree(int id, int level) 
-{
-	//how many passes do you need? We have DTid.x going from 0 to 511
-
-	if (id != 5)
-	{
-		return;
-	}
-
-	int num_of_flag_area = octree_count[2] - octree_count[1];
-	float fnumpassesflag = ceil((float)num_of_flag_area / (float)NUM_THREADS);
-	int numpassesflag = (int)fnumpassesflag;
-
-	//[allow_uav_condition]
-	for (int i = 0; i < numpassesflag; i++)
-	{
-		if (level == maxlevel) break; // don't index the last level
-		int ocv_to_work_on = id + NUM_THREADS*i;
-		if (ocv_to_work_on >= num_of_flag_area)
-			break; // don't run if there are no more indices to work on
-
-		ocv_to_work_on += octree_count[1];
-		if (GIarr[ocv_to_work_on] != 1)
-			continue; // go to next iteration of loop if not flagged
-
-		unsigned int free_space = octree_count[4];
-		octree_count[4] += 8;
-		
-
-		GIarr[ocv_to_work_on] = free_space;
-	}
-
-}
-

@@ -1,8 +1,9 @@
 #include "shaderheader.h"
 
-RWTexture1D<unsigned int> Octree_RW : register(u1);
-RWTexture1D<float> VFL : register(u2);
-RWTexture1D<unsigned int> count : register(u3);
+RWStructuredBuffer<uint> Octree_RW : register(u1);
+RWStructuredBuffer<float3> VFL : register(u2);
+RWStructuredBuffer<uint> count : register(u3);
+
 
 cbuffer ConstantBuffer : register(b0)
 {
@@ -62,7 +63,6 @@ uint put_in_octree(float3 pos, uint level) {
 		level += 1;
 	}
 
-
 	return currdex;
 }
 
@@ -72,7 +72,19 @@ uint put_in_octree(float3 pos, uint level) {
 //		2 - octree next index = current total number of elements in the 1d octree array
 //		3 - vfl index counter (cs)
 //		4 - octree index counter (cs2) = same as [2], but can be changed during CS2
+//		5 - total pixel count
 ////
+
+[numthreads(1, 1, 1)]
+void CSclear(uint3 DTid : SV_DispatchThreadID)
+{
+	for (int i = 0; i < 6; i++)
+		count[i] = 0;
+	for (int i = 0; i < BUFFERSIZE; i++)
+		Octree_RW[i] = 0;
+	for (int i = 0; i < BUFFERSIZE; i++)
+		VFL[i] = float3(0,0,0);
+}
 
 [numthreads(1, 1, 1)]
 void CSstart(uint3 DTid : SV_DispatchThreadID) 
@@ -100,6 +112,7 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 	float3 midpt = float3(0, 0, 0);
 	float midsize = vxarea / 4.;
 	uint idx = 0;
+	int xlevel = 0;
 
 	if (DTid.x != 0)
 	{
@@ -112,18 +125,21 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 		{
 		uint voxel_to_work_on = DTid.x + NUM_THREADS*i;
 		if (voxel_to_work_on >= count[0]) break;
+		octdex = 0;
+		midpt = float3(0, 0, 0);
+		midsize = vxarea / 4.;
 
 		
-		float px = VFL[voxel_to_work_on * 3 + 0];
+		/*float px = VFL[voxel_to_work_on * 3 + 0];
 		float py = VFL[voxel_to_work_on * 3 + 1];
-		float pz = VFL[voxel_to_work_on * 3 + 2];
-		float3 pos = float3(px, py, pz);
+		float pz = VFL[voxel_to_work_on * 3 + 2];*/
+		float3 pos = VFL[voxel_to_work_on];
 
-		/*float3 pos = float3(7,7,7);
-		if (DTid.x ==1)
+		//pos = float3(7,7,7);
+		/*if (DTid.x ==1)
 			pos = float3(-7, 7, 7);*/
 		[allow_uav_condition]
-		for (int xlevel = 0; xlevel < currlevel; xlevel++)
+		for (xlevel = 0; xlevel < currlevel; xlevel++)
 			{
 			if (pos.x < midpt.x)
 				{
@@ -154,6 +170,10 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 
 			currdex = octdex + idx;
 			octdex = Octree_RW[currdex];
+			/*if (octdex == 0 && xlevel != 0 && currlevel != 1)
+			{
+				Octree_RW[currdex] = 2;
+			}*/
 
 			if (idx % 2 == 0) midpt.x -= midsize;
 			else midpt.x += midsize;
@@ -166,8 +186,8 @@ void CS(uint3 DTid : SV_DispatchThreadID)
 
 			midsize = midsize / 2.;
 			}
-
-		Octree_RW[currdex] = 1;
+		if(Octree_RW[currdex] != 2)
+			Octree_RW[currdex] = 1;
 
 		}
 

@@ -15,9 +15,9 @@ Texture2D txVL : register(t4);
 Texture2D txBloom : register(t5);
 
 //RWTexture3D<float4> Voxel_GI : register(u1);
-RWTexture1D<unsigned int> Octree_RW : register(u1);
-RWTexture1D<float> VFL : register(u2);
-RWTexture1D<unsigned int> count : register(u3);
+RWStructuredBuffer<uint> Octree_RW : register(u1);
+RWStructuredBuffer<float3> VFL : register(u2);
+RWStructuredBuffer<uint> count : register(u3);
 
 Texture3D Voxels_SR : register(t3);
 Texture1D<unsigned int> Octree_SR : register(t6);
@@ -44,6 +44,8 @@ struct VS_INPUT
 	float4 Pos : POSITION;
 	float2 Tex : TEXCOORD0;
 	float3 Norm : NORMAL0;
+	float3 Tan : TANGENT0;
+	float3 Bi : BiNORMAL0;
 };
 
 struct PS_INPUT
@@ -69,6 +71,12 @@ PS_INPUT VS(VS_INPUT input)
 	output.Pos = mul(output.Pos, View);
 	output.Pos = mul(output.Pos, Projection);
 	output.Tex = input.Tex;
+
+	matrix rot = World;
+	rot._41 = rot._42 = rot._43 = 0;
+	rot._14 = rot._24 = rot._34 = 0;
+
+	output.Norm.xyz = normalize(mul(input.Norm,rot));
 
 	return output;
 }
@@ -155,58 +163,6 @@ uint put_in_octree(float3 pos) {
 
 	return currdex;
 }
-
-/*bool find_in_octree(float3 pos) {
-	uint level = 0;
-	uint octdex = 1;
-	float3 midpt = float3(0, 0, 0);
-	float midsize = vxarea / 4.;
-	uint idx = 0;
-	[unroll(8)]
-	while (level != maxlevel) {
-		if (pos.x < midpt.x) {
-			if (pos.y < midpt.y) {
-				if (pos.z < midpt.z) idx = 0;
-				else idx = 6;
-			}
-			else {
-				if (pos.z < midpt.z) idx = 2;
-				else idx = 4;
-			}
-		}
-		else {
-			if (pos.y < midpt.y) {
-				if (pos.z < midpt.z) idx = 1;
-				else idx = 7;
-			}
-			else {
-				if (pos.z < midpt.z) idx = 3;
-				else idx = 5;
-			}
-		}
-		
-		if (Octree_SR[octdex + idx] > 0)
-			octdex = Octree_SR[octdex + idx];
-		else {
-			return false;
-		}
-
-		if (idx % 2 == 0) midpt.x -= midsize;
-		else midpt.x += midsize;
-
-		if (idx < 4) midpt.z -= midsize;
-		else midpt.z += midsize;
-
-		if (idx < 6 && idx > 1) midpt.y += midsize;
-		else midpt.y -= midsize;
-
-		midsize = midsize / 2.;
-
-		level += 1;	
-	}
-
-	return true;
-}*/
 
 // 3D texture space converter
 float3 voxelspace(float3 worldpos)
@@ -348,27 +304,20 @@ PS_MRTOutput PS(PS_INPUT input) : SV_Target
 	
 	/////////////////////////////////////////////////////////
 
-	/*Octree_RW[0] = 1;
-	Octree_RW[1] = 0;
-	Octree_RW[2] = 1;
-	Octree_RW[3] = 1;
-	Octree_RW[4] = 1;
-	Octree_RW[6] = 1;
-	Octree_RW[7] = 1;
-	Octree_RW[8] = 1;*/
-	/*Octree_RW[1] = 9;
-	Octree_RW[14] = 17;
-	Octree_RW[22] = 25;
-	Octree_RW[30] = 33;
-	Octree_RW[38] = 41;
-	Octree_RW[46] = 49;
-	Octree_RW[54] = 57;
-	Octree_RW[62] = 1;*/
-	//put_in_octree(float3(0.1,0.1,0.1));
-	//put_in_octree(float3(-0.1, -0.1, -0.1));
-	//put_in_octree(viewpos);
+	/*VFL[id * 3 + 0] = viewpos.x;
+	VFL[id * 3 + 1] = viewpos.y;
+	VFL[id * 3 + 2] = viewpos.z;*/
 
-	int idx = 0;
+	uint idx;
+	InterlockedAdd(count[5], 1, idx);
+	if (idx < BUFFERSIZE)
+	{
+		InterlockedAdd(count[0], 1, idx);
+		VFL[idx] = viewpos.xyz;
+	}
+	
+
+	/*int idx = 0;
 	//InterlockedAdd(count[0], 0, idx);
 	if (count[0] < 5)
 	{
@@ -376,7 +325,7 @@ PS_MRTOutput PS(PS_INPUT input) : SV_Target
 		VFL[idx * 3 + 0] = viewpos.x;
 		VFL[idx * 3 + 1] = viewpos.y;
 		VFL[idx * 3 + 2] = viewpos.z;
-	}
+	}*/
 
 	/*int ii = 1000;
 	count[0] = ii;
@@ -390,125 +339,6 @@ PS_MRTOutput PS(PS_INPUT input) : SV_Target
 					VFL[i * 3 + 2] = -5 + zz;
 					i++;
 				}*/
-	/*Octree_RW[0] = 121;
-	Octree_RW[1] = 9;
-	Octree_RW[2] = 0;
-	Octree_RW[3] = 0;
-	Octree_RW[4] = 0;
-	Octree_RW[5] = 0;
-	Octree_RW[6] = 65;
-	Octree_RW[7] = 0;
-	Octree_RW[8] = 0;
-	Octree_RW[9] = 0;
-	Octree_RW[10] = 0;
-	Octree_RW[11] = 0;
-	Octree_RW[12] = 0;
-	Octree_RW[13] = 0;
-	Octree_RW[14] = 17;
-	Octree_RW[15] = 0;
-	Octree_RW[16] = 0;
-	Octree_RW[17] = 0;
-	Octree_RW[18] = 0;
-	Octree_RW[19] = 0;
-	Octree_RW[20] = 0;
-	Octree_RW[21] = 0;
-	Octree_RW[22] = 25;
-	Octree_RW[23] = 0;
-	Octree_RW[24] = 0;
-	Octree_RW[25] = 0;
-	Octree_RW[26] = 0;
-	Octree_RW[27] = 0;
-	Octree_RW[28] = 0;
-	Octree_RW[29] = 0;
-	Octree_RW[30] = 33;
-	Octree_RW[31] = 0;
-	Octree_RW[32] = 0;
-	Octree_RW[33] = 0;
-	Octree_RW[34] = 0;
-	Octree_RW[35] = 0;
-	Octree_RW[36] = 0;
-	Octree_RW[37] = 0;
-	Octree_RW[38] = 41;
-	Octree_RW[39] = 0;
-	Octree_RW[40] = 0;
-	Octree_RW[41] = 0;
-	Octree_RW[42] = 0;
-	Octree_RW[43] = 0;
-	Octree_RW[44] = 0;
-	Octree_RW[45] = 0;
-	Octree_RW[46] = 49;
-	Octree_RW[47] = 0;
-	Octree_RW[48] = 0;
-	Octree_RW[49] = 0;
-	Octree_RW[50] = 0;
-	Octree_RW[51] = 0;
-	Octree_RW[52] = 0;
-	Octree_RW[53] = 0;
-	Octree_RW[54] = 57;
-	Octree_RW[55] = 0;
-	Octree_RW[56] = 0;
-	Octree_RW[57] = 0;
-	Octree_RW[58] = 0;
-	Octree_RW[59] = 0;
-	Octree_RW[60] = 0;
-	Octree_RW[61] = 0;
-	Octree_RW[62] = 1;
-	Octree_RW[63] = 0;
-	Octree_RW[64] = 0;
-	Octree_RW[65] = 73;
-	Octree_RW[66] = 0;
-	Octree_RW[67] = 0;
-	Octree_RW[68] = 0;
-	Octree_RW[69] = 0;
-	Octree_RW[70] = 0;
-	Octree_RW[71] = 0;
-	Octree_RW[72] = 0;
-	Octree_RW[73] = 81;
-	Octree_RW[74] = 0;
-	Octree_RW[75] = 0;
-	Octree_RW[76] = 0;
-	Octree_RW[77] = 0;
-	Octree_RW[78] = 0;
-	Octree_RW[79] = 0;
-	Octree_RW[80] = 0;
-	Octree_RW[81] = 89;
-	Octree_RW[82] = 0;
-	Octree_RW[83] = 0;
-	Octree_RW[84] = 0;
-	Octree_RW[85] = 0;
-	Octree_RW[86] = 0;
-	Octree_RW[87] = 0;
-	Octree_RW[88] = 0;
-	Octree_RW[89] = 97;
-	Octree_RW[90] = 0;
-	Octree_RW[91] = 0;
-	Octree_RW[92] = 0;
-	Octree_RW[93] = 0;
-	Octree_RW[94] = 0;
-	Octree_RW[95] = 0;
-	Octree_RW[96] = 0;
-	Octree_RW[97] = 105;
-	Octree_RW[98] = 0;
-	Octree_RW[99] = 0;
-	Octree_RW[100] = 0;
-	Octree_RW[101] = 0;
-	Octree_RW[102] = 0;
-	Octree_RW[103] = 0;
-	Octree_RW[104] = 0;
-	Octree_RW[105] = 113;
-	Octree_RW[106] = 0;
-	Octree_RW[107] = 0;
-	Octree_RW[108] = 0;
-	Octree_RW[109] = 0;
-	Octree_RW[110] = 0;
-	Octree_RW[111] = 0;
-	Octree_RW[112] = 0;
-	Octree_RW[113] = 1;*/
-	/*int ii = 0;
-	for (; ii <= 113; ii++)
-		Octree_RW[ii] = 0;
-	put_in_octree(float3(-.1, -.1, -.1));
-	put_in_octree(float3(.1, .1, .1));*/
 	/////////////////////////////////////////////////////////
 
 	int3 ipos;
@@ -608,6 +438,26 @@ float4 PS_screen(PS_INPUT input) : SV_Target
 	}
 	return texture_color;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+float4 PSsponza(PS_INPUT input) : SV_Target
+{
+
+	float4 texture_color = txDiffuse.Sample(samLinear, input.Tex);
+	float3 n = input.Norm;
+	float3 lp = float3(50, 100,10);
+	float3 dir = normalize(lp - n);
+	float3 light = dot(dir, n.xyz);
+	float fact = light.r;
+	float infact = (fact + 1.) / 2.;
+	float result = (fact + infact) / 2.;
+
+	//fact *= 0.8;
+	//fact += 0.2;
+	float3 color= texture_color.rgb*fact;
+	return float4(color, 1);
+}
+
 
 
 float4 PScloud(PS_INPUT input) : SV_Target

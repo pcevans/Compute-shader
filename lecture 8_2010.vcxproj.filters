@@ -16,6 +16,9 @@
   <ItemGroup>
     <ClCompile Include="homework 4.cpp" />
     <ClCompile Include="render_to_texture.cpp" />
+    <ClCompile Include="load.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CLInclude Include="resource.h">

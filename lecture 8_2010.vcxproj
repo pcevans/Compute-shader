@@ -396,6 +396,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="homework 4.cpp" />
+    <ClCompile Include="load.cpp" />
     <ClCompile Include="render_to_texture.cpp" />
   </ItemGroup>
   <ItemGroup>

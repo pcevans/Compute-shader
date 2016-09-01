@@ -12,7 +12,8 @@ SamplerState Sampler : register(s0);
 SamplerState SamplerNone : register(s1);
 
 Texture3D Voxel_SR : register(t0);
-Texture1D<unsigned int> Octree_SR : register(t1);
+//Texture1D<unsigned int> Octree_SR : register(t1);
+StructuredBuffer<uint> Octree_SR : register(t1);
 
 
 
@@ -130,146 +131,6 @@ float4 find_in_octree(float3 pos) {
 	
 	return float4(midpt, 0);
 }
-
-
-/*float4 find_in_octree(float3 pos) {
-	uint level = 0;
-	uint octdex = 0;
-	float3 midpt = float3(0, 0, 0);
-	float midsize = 64. / 4.;
-	uint idx = 0;
-
-	[unroll(8)]
-	while (level != 4) {
-		if (pos.x <= midpt.x) {
-			if (pos.y <= midpt.y) {
-				if (pos.z <= midpt.z) idx = 0;
-				else idx = 6;
-			}
-			else {
-				if (pos.z <= midpt.z) idx = 2;
-				else idx = 4;
-			}
-		}
-		else {
-			if (pos.y <= midpt.y) {
-				if (pos.z <= midpt.z) idx = 1;
-				else idx = 7;
-			}
-			else {
-				if (pos.z <= midpt.z) idx = 3;
-				else idx = 5;
-			}
-		}
-
-
-		uint curr = 0;
-		curr = Octree_SR[octdex + idx];
-		if (curr > 0.01)
-			octdex = curr;
-		else
-			return float4(midpt, 0);
-
-		if (idx % 2 == 0) midpt.x -= midsize;
-		else midpt.x += midsize;
-
-		if (idx < 4) midpt.z -= midsize;
-		else midpt.z += midsize;
-
-		if (idx < 6 && idx > 1) midpt.y += midsize;
-		else midpt.y -= midsize;
-
-		midsize = midsize / 2.;
-
-		level += 1;
-	}
-
-	if (Octree_SR[idx] == 1)
-		return float4(midpt, level);
-	else
-		return float4(midpt, 0);
-}*/
-
-/*float4 find_in_octree(float3 pos) {
-	uint level = 0;
-	uint octdex = 1;
-	float3 midpt = float3(0, 0, 0);
-	float midsize = 16. / 4.;
-	uint idx = 0;
-	[unroll(8)]
-	while (level != 8) {
-		//return float4(1, 1, 0, 1);
-		if (pos.x <= midpt.x) {
-			if (pos.y <= midpt.y) {
-				if (pos.z <= midpt.z) {
-					idx = 0;
-					return float4(1, 0, 0, 1);
-				}
-				else {
-					idx = 6;
-					return float4(1, 1, 0, 1);
-				}
-			}
-			else {
-				if (pos.z <= midpt.z) {
-					idx = 2;
-					return float4(1, 1, 1, 1);
-				}
-				else {
-					idx = 4;
-					return float4(0, 1, 0, 1);
-				}
-			}
-		}
-		else {
-			if (pos.y <= midpt.y) {
-				if (pos.z <= midpt.z) {
-					idx = 1;
-					return float4(0, 1, 1, 1);
-				}
-				else {
-					idx = 7;
-					return float4(0, 0, 1, 1);
-				}
-			}
-			else {
-				if (pos.z <= midpt.z) {
-					idx = 3;
-					return float4(0, 1, 0, 1);
-				}
-				else {
-					idx = 5;
-					return float4(0, 0, 0, 1);
-				}
-			}
-		}
-
-
-		uint curr = 0;
-		curr = Octree_SR[octdex + idx];
-		if (curr > 0) {
-			//return float4(idx/8, idx / 8, idx / 8, 1);
-			octdex = curr;
-		}
-		else 
-			return float4(0,0,0,0);
-
-		midsize = midsize / 2.;
-
-		if (idx % 2 == 0) midpt.x -= midsize;
-		else midpt.x += midsize;
-
-		if (idx < 4) midpt.z -= midsize;
-		else midpt.z += midsize;
-
-		if (idx < 6 && idx > 1) midpt.y += midsize;
-		else midpt.y -= midsize;
-
-		level += 1;
-	}
-
-	return float4(.5, .5, .5, 1);
-}*/
 
 /*float3 re_voxelspace(float3 worldpos)
 {
