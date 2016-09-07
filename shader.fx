@@ -315,6 +315,8 @@ PS_MRTOutput PS(PS_INPUT input) : SV_Target
 		InterlockedAdd(count[0], 1, idx);
 		VFL[idx] = viewpos.xyz;
 	}
+
+
 	
 
 	/*int idx = 0;

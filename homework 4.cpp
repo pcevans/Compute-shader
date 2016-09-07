@@ -45,7 +45,8 @@ ID3D11Buffer*						const_count2;
 ID3D11UnorderedAccessView*			Octree_UAV;
 ID3D11ShaderResourceView*			Octree_SRV; 
 ID3D11UnorderedAccessView*			VFL_UAV;
-ID3D11UnorderedAccessView*			count_UAV; 
+ID3D11UnorderedAccessView*			count_UAV;
+ID3D11ShaderResourceView*			count_SRV;
 
 ID3D11VertexShader*                 g_pScreenVS = NULL;
 ID3D11PixelShader*                  g_pScreenPS = NULL;
@@ -861,10 +862,7 @@ HRESULT InitDevice()
 	// Load brikcs texture
 	hr = D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice, L"bricks.jpg", NULL, NULL, &g_pTextureBricks, NULL);
 	if (FAILED(hr))
-		return hr;
-
-
-	
+		return hr;	
 
 	// Load cloud normal map texture
 	hr = D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice, L"smoke_NormalMap.png", NULL, NULL, &normaltex, NULL);
@@ -1006,7 +1004,7 @@ HRESULT InitDevice()
 		return false;
 	}*/
 
-	//////////////////////////////////////////// NEW BUFFERS !!!!!!!!!! NEW NEW NEW NEW
+	//////////////////////////////////////////// NEW BUFFERS
 	
 	// Initialize RW buffer and UAV for VFL
 	D3D11_BUFFER_DESC bufferDesc;
@@ -1097,6 +1095,18 @@ HRESULT InitDevice()
 	descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
 	descUAV.Buffer = bufferUAV;
 	hr = g_pd3dDevice->CreateUnorderedAccessView(const_count2, &descUAV, &count_UAV);
+	if (FAILED(hr))
+		return false;
+
+	ZeroMemory(&bufferSRV, sizeof(bufferSRV));
+	bufferSRV.FirstElement = 0;
+	bufferSRV.NumElements = 6;
+
+	ZeroMemory(&descSRV, sizeof(descSRV));
+	descSRV.Buffer = bufferSRV;
+	descSRV.Format = DXGI_FORMAT_UNKNOWN;
+	descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+	hr = g_pd3dDevice->CreateShaderResourceView(const_count2, &descSRV, &count_SRV);
 	if (FAILED(hr))
 		return false;
 	
@@ -1475,6 +1485,11 @@ XMFLOAT2 get2dPoint(XMFLOAT3 point3D, XMMATRIX &viewMatrix, XMMATRIX &projection
 //############################################################################################################
 void Render_to_texture(long elapsed)
 {
+
+	static StopWatchMicro_ stopwatch;
+	stopwatch.start();
+	
+	
 	float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // red, green, blue, alpha
 	ID3D11RenderTargetView*			RenderTarget;
 	RenderTarget = RenderToTexture.GetRenderTarget();
@@ -1534,6 +1549,7 @@ void Render_to_texture(long elapsed)
 	g_pImmediateContext->GenerateMips(d3dtexture);
 	ID3D11ShaderResourceView* octree = Octree_SRV;
 
+
 	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
 	
@@ -1560,7 +1576,6 @@ void Render_to_texture(long elapsed)
 	//render sponza
 
 	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureBricks);
-	//M = XMMatrixIdentity();
 	M = XMMatrixScaling(10, 10, 10) * XMMatrixRotationX(-XM_PIDIV2) * XMMatrixRotationY(XM_PIDIV2)*XMMatrixTranslation(0, -5, 0);
 	
 	g_pImmediateContext->PSSetShader(PSsponza, NULL, 0);
@@ -1571,9 +1586,12 @@ void Render_to_texture(long elapsed)
 	constantbuffer.View = XMMatrixTranspose(view);
 	constantbuffer.info = XMFLOAT4(1, 1, 1, 1);
 	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
-	g_pImmediateContext->Draw(vertex_count_3ds, 0);
+	if (!voxeldraw)
+		g_pImmediateContext->Draw(vertex_count_3ds, 0);
 	
 	
+	long elapsed2 = stopwatch.elapse_micro();
+
 	// Render voxels
 	if (voxeldraw)
 	{
@@ -1587,9 +1605,12 @@ void Render_to_texture(long elapsed)
 		g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
 		g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
 
+		ID3D11ShaderResourceView* count = count_SRV;
+
 		g_pImmediateContext->GSSetShader(g_pVoxelGS, NULL, 0);
 		g_pImmediateContext->GSSetShaderResources(0, 1, &d3dtexture);
 		g_pImmediateContext->GSSetShaderResources(1, 1, &octree);
+		g_pImmediateContext->GSSetShaderResources(2, 1, &count);
 		g_pImmediateContext->GSSetConstantBuffers(0, 1, &g_pCBuffer);
 		g_pImmediateContext->GSSetSamplers(0, 1, &g_pSamplerLinear);
 
@@ -1603,8 +1624,15 @@ void Render_to_texture(long elapsed)
 
 		g_pImmediateContext->Draw(voxel.anz, 0);
 	}
+	
+	stopwatch.start(); //restart
 
 	g_pSwapChain->Present(0, 0);
+
+	elapsed2 = stopwatch.elapse_micro();
+
+
+	int k = 0;
 
 	ID3D11ShaderResourceView* srvs[D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = { 0 };
 	g_pImmediateContext->VSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
@@ -1612,309 +1640,6 @@ void Render_to_texture(long elapsed)
 	g_pImmediateContext->GSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
 
 
-
-
-}
-
-/////Light vs. shadow mapping pass
-void Render_to_texture2(long elapsed)
-{
-	float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // red, green, blue, alpha
-	ID3D11RenderTargetView*			RenderTarget;
-	RenderTarget = LightSourcePass.GetRenderTarget();
-
-	// Clear render target & shaders, set render target & primitive topology
-	g_pImmediateContext->ClearRenderTargetView(RenderTarget, ClearColor);
-	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0, 0);
-	g_pImmediateContext->OMSetRenderTargets(1, &RenderTarget, g_pDepthStencilView);
-	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	XMMATRIX view = cam.get_matrix(&g_View);
-	UINT stride = sizeof(SimpleVertex);
-	UINT offset = 0;
-
-	// Update constant buffer
-	ConstantBuffer constantbuffer;
-	constantbuffer.Projection = XMMatrixTranspose(g_Projection);
-	constantbuffer.CameraPos = XMFLOAT4(cam.position.x, cam.position.y, cam.position.z, 1);
-	XMMATRIX w = sun.get_matrix(view);
-	constantbuffer.SunPos = XMFLOAT4(w._41, w._42, w._43, 1);
-
-	// Sky sphere day and night cycle
-	static float f = 0.1;
-	f = f + 0.0001f;
-	f += elapsed / 10000000.0f;
-	constantbuffer.DayTimer.x = cos(f);
-
-	// Render sun
-	XMMATRIX worldmatrix = XMMatrixIdentity();
-	sun.rotation += elapsed / 5500000.0f;
-	worldmatrix = sun.get_matrix(view);
-	constantbuffer.World = XMMatrixTranspose(worldmatrix);
-	constantbuffer.View = XMMatrixTranspose(view);
-	constantbuffer.info.x = 1;
-	constantbuffer.info.y = 0;
-	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
-
-	g_pImmediateContext->VSSetShader(g_pShadowVS, NULL, 0);
-	g_pImmediateContext->VSSetShaderResources(0, 1, &g_pTextureSun);
-	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
-
-	g_pImmediateContext->PSSetShader(g_pSunPS, NULL, 0);
-	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureSun);
-	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
-	
-	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
-	g_pImmediateContext->OMSetDepthStencilState(ds_off, 1);
-
-	g_pImmediateContext->Draw(12, 0);
-
-	// Render clouds
-	ID3D11ShaderResourceView* d3dtexture = Voxel_GI.GetShaderResourceView();	
-	g_pImmediateContext->GenerateMips(d3dtexture);
-
-	g_pImmediateContext->VSSetShader(g_pShadowVS, NULL, 0);
-	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-
-	g_pImmediateContext->PSSetShader(g_pShadowPS, NULL, 0);
-	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureRV);
-	g_pImmediateContext->PSSetShaderResources(3, 1, &d3dtexture);
-	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
-	
-	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
-	g_pImmediateContext->OMSetDepthStencilState(ds_off, 1);
-
-	for (int ii = 0; ii < 1; ii++)
-	{
-		ConstantBuffer constantbuffer;
-		constantbuffer.info.x = 0;
-		constantbuffer.info.y = 1;
-
-		worldmatrix = smokeray[ii]->get_matrix(view);
-		constantbuffer.World = XMMatrixTranspose(worldmatrix);
-		constantbuffer.View = XMMatrixTranspose(view);
-		constantbuffer.Projection = XMMatrixTranspose(g_Projection);
-		constantbuffer.info = XMFLOAT4(smokeray[ii]->transparency, 1, 1, 1);
-		g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
-
-		g_pImmediateContext->Draw(12, 0);
-	}
-
-	// Render voxels
-	if (voxeldraw)
-	{
-		constantbuffer.World = XMMatrixTranspose(XMMatrixIdentity());
-		constantbuffer.View = XMMatrixTranspose(view);
-		constantbuffer.Projection = XMMatrixTranspose(g_Projection);
-		constantbuffer.info.x = 1;
-		g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
-		
-		g_pImmediateContext->VSSetShader(g_pVoxelVS, NULL, 0);
-		g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
-		
-		g_pImmediateContext->GSSetShader(g_pVoxelGS, NULL, 0);
-		g_pImmediateContext->GSSetShaderResources(5, 1, &d3dtexture);
-		g_pImmediateContext->GSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->GSSetSamplers(0, 1, &g_pSamplerLinear);
-		
-		g_pImmediateContext->PSSetShader(g_pVoxelPS, NULL, 0);
-		g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-		g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
-		
-		g_pImmediateContext->IASetVertexBuffers(0, 1, &voxel.vbuffer, &stride, &offset);
-		g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-		g_pImmediateContext->OMSetDepthStencilState(ds_on, 1);
-
-		g_pImmediateContext->Draw(voxel.anz, 0);
-	}
-	g_pSwapChain->Present(0, 0);
-
-	ID3D11ShaderResourceView* srvs[D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = { 0 };
-	g_pImmediateContext->VSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
-	g_pImmediateContext->PSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
-}
-
-/////////Volumetric lighting approximation pass
-void Render_to_texture3(long elapsed)
-{
-	float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // red, green, blue, alpha
-	ID3D11RenderTargetView*			RenderTarget = VolumetricPass.GetRenderTarget();
-	ID3D11ShaderResourceView*		texture = LightSourcePass.GetShaderResourceView();
-
-	// Clear render target & shaders, set render target & primitive topology
-	g_pImmediateContext->ClearRenderTargetView(RenderTarget, ClearColor);
-	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0, 0);
-	g_pImmediateContext->OMSetRenderTargets(1, &RenderTarget, g_pDepthStencilView);
-	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	XMMATRIX view = cam.get_matrix(&g_View);
-
-	UINT stride = sizeof(SimpleVertex);
-	UINT offset = 0;
-
-	XMMATRIX w = sun.get_matrix(view);
-	XMFLOAT3 lpos = XMFLOAT3(w._41, w._42, w._43);
-	XMMATRIX ip = g_Projection;
-	XMMATRIX iv = view;
-	XMFLOAT2 screencam = get2dPoint(lpos, iv, ip);
-	screencam.y = -screencam.y;
-
-	// Update constant buffer
-	ConstantBuffer constantbuffer;
-	constantbuffer.World = XMMatrixIdentity();
-	constantbuffer.View = view;
-	constantbuffer.Projection = g_Projection;
-	constantbuffer.info.x = screencam.x;
-	constantbuffer.info.y = screencam.y;
-	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0); 
-
-	g_pImmediateContext->VSSetShader(g_pEffectVS, NULL, 0);
-	g_pImmediateContext->VSSetShaderResources(0, 1, &texture);
-	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
-
-	g_pImmediateContext->PSSetShader(g_pEffectPS, NULL, 0);
-	g_pImmediateContext->PSSetShaderResources(0, 1, &texture);
-	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
-
-	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer_screen, &stride, &offset);
-	g_pImmediateContext->OMSetDepthStencilState(ds_on, 1);
-
-	g_pImmediateContext->Draw(6, 0);
-
-	// Present our back buffer to our front buffer
-	g_pSwapChain->Present(0, 0);
-
-	ID3D11ShaderResourceView* srvs[D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = { 0 };
-	g_pImmediateContext->VSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
-	g_pImmediateContext->PSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
-
-}
-
-/////bright pass
-void Render_to_texturebright(long elapsed)
-{
-	float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // red, green, blue, alpha
-	ID3D11RenderTargetView*			RenderTarget;
-	RenderTarget = BrightPass.GetRenderTarget();
-
-	ID3D11ShaderResourceView*		texture = RenderToTexture.GetShaderResourceView();
-
-	// Clear render target & shaders, set render target & primitive topology
-	g_pImmediateContext->ClearRenderTargetView(RenderTarget, ClearColor);
-	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0, 0);
-	g_pImmediateContext->OMSetRenderTargets(1, &RenderTarget, g_pDepthStencilView);
-	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	XMMATRIX view = cam.get_matrix(&g_View);
-
-	UINT stride = sizeof(SimpleVertex);
-	UINT offset = 0;
-
-	XMMATRIX worldmatrix = XMMatrixIdentity();
-	XMMATRIX T, S, Rx, Ry;
-
-	// Update constant buffer
-	ConstantBuffer constantbuffer;
-	constantbuffer.View = XMMatrixTranspose(view);
-	constantbuffer.Projection = XMMatrixTranspose(g_Projection);
-	constantbuffer.CameraPos = XMFLOAT4(cam.position.x, cam.position.y, cam.position.z, 1);
-	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0); //update constant buffer
-
-	g_pImmediateContext->VSSetShader(g_pBloomVS, NULL, 0); //set vertex shader
-	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer); //set constant buffer for vertex shader
-	g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);
-
-	g_pImmediateContext->PSSetShader(g_pBrightPS, NULL, 0); //set pixel shader
-	g_pImmediateContext->PSSetShaderResources(0, 1, &texture); //set texture resource for pixel shader
-	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear); //set sampler for pixel and vertex buffers
-
-	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer_screen, &stride, &offset); //set desired model's vertex buffer
-	g_pImmediateContext->OMSetDepthStencilState(ds_off, 1);
-
-	g_pImmediateContext->Draw(6, 0);
-
-	g_pSwapChain->Present(0, 0);
-
-	ID3D11ShaderResourceView* srvs[D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = { 0 };
-	g_pImmediateContext->VSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
-	g_pImmediateContext->PSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
-}
-
-/////////bloom pass
-void Render_to_texturebloom(long elapsed)
-{
-	float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f }; // red, green, blue, alpha
-	ID3D11RenderTargetView*			RenderTarget = BloomPass.GetRenderTarget();
-	ID3D11ShaderResourceView*		texture = BrightPass.GetShaderResourceView();
-	ID3D11ShaderResourceView*		texture1 = RenderToTexture.GetShaderResourceView();
-
-	// Clear render target & shaders, set render target & primitive topology
-	g_pImmediateContext->ClearRenderTargetView(RenderTarget, ClearColor);
-	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0, 0);
-	g_pImmediateContext->OMSetRenderTargets(1, &RenderTarget, g_pDepthStencilView);
-	g_pImmediateContext->VSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->PSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->GSSetShader(NULL, NULL, 0);
-	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	XMMATRIX view = cam.get_matrix(&g_View);
-
-	UINT stride = sizeof(SimpleVertex);
-	UINT offset = 0;
-
-	XMFLOAT3 lpos = XMFLOAT3(25, 50, 500);
-	XMMATRIX ip = g_Projection;
-	XMMATRIX iv = view;
-	XMFLOAT2 screencam = get2dPoint(lpos, iv, ip);
-	screencam.y = -screencam.y;
-
-	ConstantBuffer constantbuffer;
-	constantbuffer.World = XMMatrixIdentity();
-	constantbuffer.View = view;
-	constantbuffer.Projection = g_Projection;
-	constantbuffer.info.x = screencam.x;
-	constantbuffer.info.y = screencam.y;
-	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0); //update constant buffer
-
-	g_pImmediateContext->VSSetShader(g_pBloomVS, NULL, 0);			//set vertex shader
-	g_pImmediateContext->VSSetShaderResources(0, 1, &texture);		//set texture resource for vertex shader
-	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);	//set constant buffer for vertex shader
-	g_pImmediateContext->VSSetShaderResources(1, 1, &texture1);		//set texture resource for vertex shader
-	g_pImmediateContext->VSSetSamplers(0, 1, &g_pSamplerLinear);	//set sampler for vertex shader
-
-	g_pImmediateContext->PSSetShader(g_pBloomPS, NULL, 0);			//set pixel shader
-	g_pImmediateContext->PSSetShaderResources(0, 1, &texture);
-	g_pImmediateContext->PSSetShaderResources(1, 1, &texture1);
-	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBuffer);
-	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
-
-	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer_screen, &stride, &offset); //set desired model's vertex buffer
-	g_pImmediateContext->OMSetDepthStencilState(ds_on, 1);
-
-	g_pImmediateContext->Draw(6, 0);
-
-	// Present our back buffer to our front buffer
-	g_pSwapChain->Present(0, 0);
-
-	ID3D11ShaderResourceView* srvs[D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = { 0 };
-	g_pImmediateContext->VSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
-	g_pImmediateContext->PSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
 }
 
 /*void MakeClouds()
@@ -2026,7 +1751,7 @@ void Render_to_3dtexture(long elapsed)
 				swapped = true;
 			}
 		}
-	} while (swapped);*/
+	} while (swapped);*/ // ********************************************************************************************
 
 	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
 	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBuffer);
@@ -2050,7 +1775,7 @@ void Render_to_3dtexture(long elapsed)
 		g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
 
 		g_pImmediateContext->Draw(12, 0);
-	}*/
+	}*/  //********************************************************************************************
 
 	g_pImmediateContext->OMSetDepthStencilState(ds_on, 1);
 
@@ -2067,12 +1792,17 @@ void Render_to_3dtexture(long elapsed)
 	constantbuffer.info = XMFLOAT4(1, 1, 1, 1);
 	g_pImmediateContext->UpdateSubresource(g_pCBuffer, 0, NULL, &constantbuffer, 0, 0);
 	g_pImmediateContext->Draw(vertex_count_3ds, 0);
-
+	
+	
+	StopWatchMicro_ stopwatch;
+	stopwatch.start(); //restart
 	g_pSwapChain->Present(0, 0);
+	long el = stopwatch.elapse_micro();
 
+	
 	ID3D11RenderTargetView* RT;
 	RT = 0;
-	for(int i = 0; i < 3; i++)
+	/*for(int i = 0; i < 3; i++)
 		uav[i] = 0;
 	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RT, 0, 1, 3, uav, 0);	
 
@@ -2080,8 +1810,8 @@ void Render_to_3dtexture(long elapsed)
 	g_pImmediateContext->VSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
 	g_pImmediateContext->PSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
 
-
-	debugCS();
+	*/
+	//debugCS();
 
 }
 
@@ -2289,7 +2019,10 @@ void debugCS()
 
 void run_compute_shader(long elapsed)
 	{
-	 
+	static StopWatchMicro_ stopwatch;
+	elapsed = stopwatch.elapse_micro();
+
+	
 	// reset shader resource and unordered access views
 	ID3D11ShaderResourceView* pNullSRV = NULL;
 	ID3D11UnorderedAccessView* pNullUAV = NULL;
@@ -2329,8 +2062,10 @@ void run_compute_shader(long elapsed)
 	// flagging for first level
 	g_pImmediateContext->CSSetShader(g_pFlaggingCS, NULL, 0);
 	g_pImmediateContext->Dispatch(1, 1, 1);
-	debugCS();
 
+	
+
+	
 	for (int i = 1; i < maxlevel; i++)			//maxlevel = 8
 	{
 	
@@ -2342,23 +2077,21 @@ void run_compute_shader(long elapsed)
 		//building
 		g_pImmediateContext->CSSetShader(g_pBuildingCS, NULL, 0);
 		g_pImmediateContext->Dispatch(1, 1, 1);
-		debugCS();
 
 		//passing the level + 1
 		constantbufferCS.values = XMFLOAT4((float)i + EPS + 1.0, 0, 0, 0);
 		g_pImmediateContext->UpdateSubresource(g_pCBufferCS, 0, NULL, &constantbufferCS, 0, 0);
 		g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBufferCS);
-		//debugCS();
 
 		//flagging
 		g_pImmediateContext->CSSetShader(g_pFlaggingCS, NULL, 0);
-		g_pImmediateContext->Dispatch(1, 1, 1);			
+		g_pImmediateContext->Dispatch(1, 1, 1);
+	}
+	
 
-		debugCS();
-	}	
-
-	debugCS();
-
+	
+	//g_pSwapChain->Present(0, 0);
+	elapsed = stopwatch.elapse_micro();
 	int z;
 	z = 0;
 	Reset_CS();
@@ -2404,7 +2137,7 @@ void clear_uavs(long elapsed)
 	g_pImmediateContext->CSSetShader(g_pClearCS, NULL, 0);
 	g_pImmediateContext->Dispatch(1, 1, 1);
 
-	debugCS();
+	//debugCS();
 
 	int z;
 	z = 0;
@@ -2416,34 +2149,34 @@ void Render()
 {
 	static StopWatchMicro_ stopwatch; 
 	long elapsed = stopwatch.elapse_micro();
-	stopwatch.start(); //restart
-
-	debugCS();
-
+	
+	
 	cam.animation(elapsed);
 
-	stopwatch.start();
-	Render_to_3dtexture(elapsed);
-	elapsed = stopwatch.elapse_micro();
-
 	stopwatch.start(); //restart
-	run_compute_shader(elapsed);	//could be anywhere in the render pipeline //NEW NEW 
-	elapsed = stopwatch.elapse_micro();
+	g_pSwapChain->Present(0, 0);
+	long el = stopwatch.elapse_micro();
 	
+	stopwatch.start(); //restart
+	Render_to_3dtexture(elapsed);
+	el = stopwatch.elapse_micro();
+	
+	
+	stopwatch.start(); //restart
+	g_pSwapChain->Present(0, 0);
+	el = stopwatch.elapse_micro();
+
+
+	run_compute_shader(elapsed);
 	stopwatch.start();
+	//stopwatch.start(); //restart
 	Render_to_texture(elapsed);
 	elapsed = stopwatch.elapse_micro();
 
-	stopwatch.start();
-	Render_to_texture2(elapsed);
-	elapsed = stopwatch.elapse_micro();
-
-	Render_to_texturebright(elapsed);	//bright
-	Render_to_texturebloom(elapsed);	//bloom
-	Render_to_texture3(elapsed);
+	
 	Render_to_screen(elapsed);
 	
 	clear_uavs(elapsed);
 
-	debugCS();
+	
 }

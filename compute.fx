@@ -75,15 +75,29 @@ uint put_in_octree(float3 pos, uint level) {
 //		5 - total pixel count
 ////
 
-[numthreads(1, 1, 1)]
+[numthreads(NUM_THREADS, 1, 1)]
 void CSclear(uint3 DTid : SV_DispatchThreadID)
 {
-	for (int i = 0; i < 6; i++)
-		count[i] = 0;
-	for (int i = 0; i < BUFFERSIZE; i++)
-		Octree_RW[i] = 0;
-	for (int i = 0; i < BUFFERSIZE; i++)
-		VFL[i] = float3(0,0,0);
+
+	
+	count[0] = 0;
+	count[1] = 0;
+	count[2] = 0;
+	count[3] = 0;
+	count[4] = 0;
+	count[5] = 0;
+	//count[6] = 0;
+
+	float fnumpassesflag = ceil((float)BUFFERSIZE / (float)NUM_THREADS);
+	int numpassesflag = (int)fnumpassesflag;
+
+	for (int i = 0; i < numpassesflag; i++)
+		{
+		uint index = DTid.x + NUM_THREADS*i;
+		if (index >= BUFFERSIZE) break;
+		Octree_RW[index] = 0;
+		VFL[index] = float3(0, 0, 0);
+		}
 }
 
 [numthreads(1, 1, 1)]

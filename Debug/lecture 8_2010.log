@@ -1,2 +1,3 @@
-﻿  lecture 8_2010.vcxproj -> C:\Users\gameprogrammer\Desktop\Compute shader\Compute shader\Debug\homework 4.exe
+﻿homework 4.obj : warning LNK4075: ignoring '/EDITANDCONTINUE' due to '/SAFESEH' specification
+  lecture 8_2010.vcxproj -> C:\Users\gameprogrammer\Desktop\Compute shader\Compute shader\Debug\homework 4.exe
   lecture 8_2010.vcxproj -> C:\Users\gameprogrammer\Desktop\Compute shader\Compute shader\Debug\homework 4.pdb (Full PDB)

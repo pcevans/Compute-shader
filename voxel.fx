@@ -14,6 +14,7 @@ SamplerState SamplerNone : register(s1);
 Texture3D Voxel_SR : register(t0);
 //Texture1D<unsigned int> Octree_SR : register(t1);
 StructuredBuffer<uint> Octree_SR : register(t1);
+StructuredBuffer<uint> count : register(t2);
 
 
 
@@ -245,7 +246,7 @@ void GS(point VS_OUTPUT input[1], inout TriangleStream<VS_OUTPUT> triStream)
 	triStream.RestartStrip();
 }*/
 
-[maxvertexcount(36)]
+/*[maxvertexcount(36)]
 void GS(point VS_OUTPUT input[1], inout TriangleStream<VS_OUTPUT> triStream)
 {
 
@@ -259,51 +260,51 @@ void GS(point VS_OUTPUT input[1], inout TriangleStream<VS_OUTPUT> triStream)
 	world._41 = 0;
 	world._43 = 0;
 	world._44 = 1;
+	float ff = 0.5;
+	tri[0] = float4(0, 0, 0, 1)*ff;
+	tri[1] = float4(0, 1, 0, 1)*ff;
+	tri[2] = float4(1, 1, 0, 1)*ff;
+	tri[3] = float4(0, 0, 0, 1)*ff;
+	tri[4] = float4(1, 1, 0, 1)*ff;
+	tri[5] = float4(1, 0, 0, 1)*ff;
 
-	tri[0] = float4(0, 0, 0, 1);
-	tri[1] = float4(0, 1, 0, 1);
-	tri[2] = float4(1, 1, 0, 1);
-	tri[3] = float4(0, 0, 0, 1);
-	tri[4] = float4(1, 1, 0, 1);
-	tri[5] = float4(1, 0, 0, 1);
-
-	tri[6] = float4(0, 1, 1, 1);
-	tri[7] = float4(0, 0, 1, 1);
-	tri[8] = float4(1, 1, 1, 1);
-	tri[9] = float4(0, 0, 1, 1);
-	tri[10] = float4(1, 0, 1, 1);
-	tri[11] = float4(1, 1, 1, 1);
+	tri[6] = float4(0, 1, 1, 1)*ff;
+	tri[7] = float4(0, 0, 1, 1)*ff;
+	tri[8] = float4(1, 1, 1, 1)*ff;
+	tri[9] = float4(0, 0, 1, 1)*ff;
+	tri[10] = float4(1, 0, 1, 1)*ff;
+	tri[11] = float4(1, 1, 1, 1)*ff;
 
 	//ou
-	tri[12] = float4(0, 1, 0, 1);
-	tri[13] = float4(0, 1, 1, 1);
-	tri[14] = float4(1, 1, 1, 1);
-	tri[15] = float4(0, 1, 0, 1);
-	tri[16] = float4(1, 1, 1, 1);
-	tri[17] = float4(1, 1, 0, 1);
+	tri[12] = float4(0, 1, 0, 1)*ff;
+	tri[13] = float4(0, 1, 1, 1)*ff;
+	tri[14] = float4(1, 1, 1, 1)*ff;
+	tri[15] = float4(0, 1, 0, 1)*ff;
+	tri[16] = float4(1, 1, 1, 1)*ff;
+	tri[17] = float4(1, 1, 0, 1)*ff;
 
-	tri[18] = float4(0, 0, 0, 1);
-	tri[19] = float4(1, 0, 1, 1);
-	tri[20] = float4(0, 0, 1, 1);
-	tri[21] = float4(0, 0, 0, 1);
-	tri[22] = float4(1, 0, 0, 1);
-	tri[23] = float4(1, 0, 1, 1);
+	tri[18] = float4(0, 0, 0, 1)*ff;
+	tri[19] = float4(1, 0, 1, 1)*ff;
+	tri[20] = float4(0, 0, 1, 1)*ff;
+	tri[21] = float4(0, 0, 0, 1)*ff;
+	tri[22] = float4(1, 0, 0, 1)*ff;
+	tri[23] = float4(1, 0, 1, 1)*ff;
 
 	//lr
-	tri[24] = float4(0, 0, 0, 1);
-	tri[25] = float4(0, 0, 1, 1);
-	tri[26] = float4(0, 1, 1, 1);
-	tri[27] = float4(0, 0, 0, 1);
-	tri[28] = float4(0, 1, 1, 1);
-	tri[29] = float4(0, 1, 0, 1);
+	tri[24] = float4(0, 0, 0, 1)*ff;
+	tri[25] = float4(0, 0, 1, 1)*ff;
+	tri[26] = float4(0, 1, 1, 1)*ff;
+	tri[27] = float4(0, 0, 0, 1)*ff;
+	tri[28] = float4(0, 1, 1, 1)*ff;
+	tri[29] = float4(0, 1, 0, 1)*ff;
 
 	
-	tri[30] = float4(1, 0, 1, 1);
-	tri[31] = float4(1, 0, 0, 1);
-	tri[32] = float4(1, 1, 1, 1);
-	tri[33] = float4(1, 0, 0, 1);
-	tri[34] = float4(1, 1, 0, 1);
-	tri[35] = float4(1, 1, 1, 1);
+	tri[30] = float4(1, 0, 1, 1)*ff;
+	tri[31] = float4(1, 0, 0, 1)*ff;
+	tri[32] = float4(1, 1, 1, 1)*ff;
+	tri[33] = float4(1, 0, 0, 1)*ff;
+	tri[34] = float4(1, 1, 0, 1)*ff;
+	tri[35] = float4(1, 1, 1, 1)*ff;
 
 	float4 pos2 = find_in_octree(pos.xyz);
 
@@ -367,6 +368,146 @@ void GS(point VS_OUTPUT input[1], inout TriangleStream<VS_OUTPUT> triStream)
 			psInput.Position = posfin;
 
 			
+
+			if (i >= 28) acol.rgb *= 0.5;
+			else if (i >= 22) acol.rgb *= 0.6;
+			else if (i >= 16) acol.rgb *= 0.7;
+			else if (i >= 10) acol.rgb *= 0.8;
+			else if (i >= 4) acol.rgb *= 0.9;
+			else if (i >= 1) acol.rgb *= 0.95;
+
+			psInput.color = float4(acol.rgb, 1);
+
+			triStream.Append(psInput);
+			if (i == 2 || i == 5 || i == 8 || i == 11 || i == 14 || i == 17 || i == 20 || i == 23 || i == 26 || i == 29 || i == 32)
+				triStream.RestartStrip();
+		}
+	}
+	triStream.RestartStrip();
+}*/
+
+[maxvertexcount(36)]
+void GS(point VS_OUTPUT input[1], inout TriangleStream<VS_OUTPUT> triStream)
+{
+
+	float4x4 proj = Projection;
+	float4x4 view = View;
+	float4x4 world = World;
+	float4 tri[36];
+	float4 pos = input[0].Position - float4(vxarea / 2, (float)vxarea / 2, (float)vxarea / 2, 0); // level below - 1
+
+	world._42 = 0;
+	world._41 = 0;
+	world._43 = 0;
+	world._44 = 1;
+	float ff = 1;
+	tri[0] = float4(0, 0, 0, 1)*ff;
+	tri[1] = float4(0, 1, 0, 1)*ff;
+	tri[2] = float4(1, 1, 0, 1)*ff;
+	tri[3] = float4(0, 0, 0, 1)*ff;
+	tri[4] = float4(1, 1, 0, 1)*ff;
+	tri[5] = float4(1, 0, 0, 1)*ff;
+
+	tri[6] = float4(0, 1, 1, 1)*ff;
+	tri[7] = float4(0, 0, 1, 1)*ff;
+	tri[8] = float4(1, 1, 1, 1)*ff;
+	tri[9] = float4(0, 0, 1, 1)*ff;
+	tri[10] = float4(1, 0, 1, 1)*ff;
+	tri[11] = float4(1, 1, 1, 1)*ff;
+
+	//ou
+	tri[12] = float4(0, 1, 0, 1)*ff;
+	tri[13] = float4(0, 1, 1, 1)*ff;
+	tri[14] = float4(1, 1, 1, 1)*ff;
+	tri[15] = float4(0, 1, 0, 1)*ff;
+	tri[16] = float4(1, 1, 1, 1)*ff;
+	tri[17] = float4(1, 1, 0, 1)*ff;
+
+	tri[18] = float4(0, 0, 0, 1)*ff;
+	tri[19] = float4(1, 0, 1, 1)*ff;
+	tri[20] = float4(0, 0, 1, 1)*ff;
+	tri[21] = float4(0, 0, 0, 1)*ff;
+	tri[22] = float4(1, 0, 0, 1)*ff;
+	tri[23] = float4(1, 0, 1, 1)*ff;
+
+	//lr
+	tri[24] = float4(0, 0, 0, 1)*ff;
+	tri[25] = float4(0, 0, 1, 1)*ff;
+	tri[26] = float4(0, 1, 1, 1)*ff;
+	tri[27] = float4(0, 0, 0, 1)*ff;
+	tri[28] = float4(0, 1, 1, 1)*ff;
+	tri[29] = float4(0, 1, 0, 1)*ff;
+
+
+	tri[30] = float4(1, 0, 1, 1)*ff;
+	tri[31] = float4(1, 0, 0, 1)*ff;
+	tri[32] = float4(1, 1, 1, 1)*ff;
+	tri[33] = float4(1, 0, 0, 1)*ff;
+	tri[34] = float4(1, 1, 0, 1)*ff;
+	tri[35] = float4(1, 1, 1, 1)*ff;
+
+	float4 pos2 = find_in_octree(pos.xyz);
+
+	VS_OUTPUT psInput = (VS_OUTPUT)0;
+	if (pos2.a == maxlevel)
+	{
+		for (uint i = 0; i < 36; i++)
+		{
+			//float4 trimodvec = float4(0.5, 0.5, 0.5,1);
+			float4 posfin = pos + tri[i];
+			posfin.w = 1;
+
+
+			float4 acol = float4(1, 1, 1, 1);
+			////////////////
+			if (pos.x < 0) //1 red
+				if (pos.y < 0)
+					if (pos.z < 0)
+						acol = float4(1, 0, 0, 1);
+
+			if (pos.x >= 0) //2 orange
+				if (pos.y < 0)
+					if (pos.z < 0)
+						acol = float4(1, 0.3, 0, 1);
+
+			if (pos.x < 0) //3 yellow
+				if (pos.y >= 0)
+					if (pos.z < 0)
+						acol = float4(1, 1, 0, 1);
+
+			if (pos.x >= 0) //4 green
+				if (pos.y >= 0)
+					if (pos.z < 0)
+						acol = float4(0, 0.5, 0, 1);
+
+			if (pos.x < 0) //5 blue
+				if (pos.y >= 0)
+					if (pos.z >= 0)
+						acol = float4(0, 0, 1, 1);
+
+			if (pos.x >= 0) //6 purple
+				if (pos.y >= 0)
+					if (pos.z >= 0)
+						acol = float4(0.3, 0, 0.5, 1);
+
+			if (pos.x < 0) //7 pink
+				if (pos.y < 0)
+					if (pos.z >= 0)
+						acol = float4(0.9, 0.5, 0.9, 1);
+
+			if (pos.x >= 0)
+				if (pos.y < 0)
+					if (pos.z >= 0)
+						acol = float4(.9, .9, .9, 1);
+			///////////////////////
+
+
+			posfin = mul(posfin, View);
+			posfin = mul(posfin, Projection);
+
+			psInput.Position = posfin;
+
+
 
 			if (i >= 28) acol.rgb *= 0.5;
 			else if (i >= 22) acol.rgb *= 0.6;
