@@ -3,68 +3,13 @@
 RWStructuredBuffer<uint> Octree_RW : register(u1);
 RWStructuredBuffer<float3> VFL : register(u2);
 RWStructuredBuffer<uint> count : register(u3);
+RWStructuredBuffer<float3> VFLcolors : register(u4);
 
 
 cbuffer ConstantBuffer : register(b0)
 {
 	float4 CBvalues; 
 };
-
-uint put_in_octree(float3 pos, uint level) {
-	uint octdex = 0;
-	uint currdex = 0;
-	uint flag;
-	float3 midpt = float3(0, 0, 0);
-	float midsize = vxarea / 4.;
-	uint idx = 0;
-	if (Octree_RW[0] == 0)
-		Octree_RW[0] = 8 + octdex;
-
-	if (level == 0)
-		flag = 1;
-	else flag = 2;
-
-	while (level != maxlevel) {
-		if (pos.x < midpt.x) {
-			if (pos.y < midpt.y) {
-				if (pos.z < midpt.z) idx = 0;
-				else idx = 6;
-			}
-			else {
-				if (pos.z < midpt.z) idx = 2;
-				else idx = 4;
-			}
-		}
-		else {
-			if (pos.y < midpt.y) {
-				if (pos.z < midpt.z) idx = 1;
-				else idx = 7;
-			}
-			else {
-				if (pos.z < midpt.z) idx = 3;
-				else idx = 5;
-			}
-		}
-
-		currdex = octdex + idx;
-		
-
-		if (idx % 2 == 0) midpt.x -= midsize;
-		else midpt.x += midsize;
-
-		if (idx < 4) midpt.z -= midsize;
-		else midpt.z += midsize;
-
-		if (idx < 6 && idx > 1) midpt.y += midsize;
-		else midpt.y -= midsize;
-
-		midsize = midsize / 2.;
-
-		level += 1;
-	}
-
-	return currdex;
-}
 
 ////	count[4]
 //		0 - vfl count
@@ -86,7 +31,6 @@ void CSclear(uint3 DTid : SV_DispatchThreadID)
 	count[3] = 0;
 	count[4] = 0;
 	count[5] = 0;
-	//count[6] = 0;
 
 	float fnumpassesflag = ceil((float)BUFFERSIZE / (float)NUM_THREADS);
 	int numpassesflag = (int)fnumpassesflag;
@@ -97,6 +41,7 @@ void CSclear(uint3 DTid : SV_DispatchThreadID)
 		if (index >= BUFFERSIZE) break;
 		Octree_RW[index] = 0;
 		VFL[index] = float3(0, 0, 0);
+		VFLcolors[index] = float3(0, 0, 0);
 		}
 }
 
@@ -104,7 +49,7 @@ void CSclear(uint3 DTid : SV_DispatchThreadID)
 void CSstart(uint3 DTid : SV_DispatchThreadID) 
 {
 	count[2] = 0;
-	count[4] = 8;
+	count[4] = 9;
 }
 
 [numthreads(NUM_THREADS, 1, 1)]	// means, DTid.x goes from 0 to NUM_THREADS !!!!!!!!!
@@ -236,7 +181,7 @@ void CS2(uint3 DTid : SV_DispatchThreadID)
 			continue; // go to next iteration of loop if not flagged
 
 		uint free_space = 0;
-		InterlockedAdd(count[4], 8, free_space);
+		InterlockedAdd(count[4], 9, free_space);
 		
 		Octree_RW[ocv_to_work_on] = free_space;
 		}

@@ -40,11 +40,13 @@ RenderTextureClass					VFL;
 RenderTextureClass					const_count;
 
 ID3D11Buffer*						Octree_RW2; 
-ID3D11Buffer*						VFL2; 
+ID3D11Buffer*						VFL2;
+ID3D11Buffer*						VFLcolors;
 ID3D11Buffer*						const_count2; 
 ID3D11UnorderedAccessView*			Octree_UAV;
 ID3D11ShaderResourceView*			Octree_SRV; 
 ID3D11UnorderedAccessView*			VFL_UAV;
+ID3D11UnorderedAccessView*			VFLcolors_UAV;
 ID3D11UnorderedAccessView*			count_UAV;
 ID3D11ShaderResourceView*			count_SRV;
 
@@ -128,6 +130,9 @@ bool                                madeClouds = false;
 int									octree_count[6];
 
 #define ROCKETRADIUS				10
+
+D3D11_VIEWPORT						viewport_normal;
+D3D11_VIEWPORT						viewport_octree;
 
 int GIarr[100];
 
@@ -363,16 +368,25 @@ HRESULT InitDevice()
 	if (FAILED(hr))
 		return hr;
 
-	// Setup the viewport
-	D3D11_VIEWPORT vp;
-	vp.Width = (FLOAT)width;
-	vp.Height = (FLOAT)height;
-	vp.MinDepth = 0.0f;
-	vp.MaxDepth = 1.0f;
-	vp.TopLeftX = 0;
-	vp.TopLeftY = 0;
-	g_pImmediateContext->RSSetViewports(1, &vp);
+	
 
+	// Setup the viewport
+
+	viewport_normal.Width = (FLOAT)width;
+	viewport_normal.Height = (FLOAT)height;
+	viewport_normal.MinDepth = 0.0f;
+	viewport_normal.MaxDepth = 1.0f;
+	viewport_normal.TopLeftX = 0;
+	viewport_normal.TopLeftY = 0;
+	g_pImmediateContext->RSSetViewports(1, &viewport_normal);
+
+	viewport_octree.Width = (FLOAT)width/4;
+	viewport_octree.Height = (FLOAT)height/4;
+	viewport_octree.MinDepth = 0.0f;
+	viewport_octree.MaxDepth = 1.0f;
+	viewport_octree.TopLeftX = 0;
+	viewport_octree.TopLeftY = 0;
+	
 	/////////// Shaders ///////////
 	ID3DBlob* pVSBlob = NULL;
 	ID3DBlob* pGSBlob = NULL;
@@ -1034,6 +1048,31 @@ HRESULT InitDevice()
 	if (FAILED(hr))
 		return false;
 
+	// Initialize RW buffer and UAV for VFL colors
+	ZeroMemory(&bufferDesc, sizeof(bufferDesc));
+	bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+	bufferDesc.ByteWidth = sizeof(XMFLOAT3) * BUFFERSIZE;
+	bufferDesc.StructureByteStride = sizeof(XMFLOAT3);
+	bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+	hr = g_pd3dDevice->CreateBuffer(&bufferDesc, NULL, &VFLcolors);
+	if (FAILED(hr))
+		return false;
+
+	ZeroMemory(&bufferUAV, sizeof(bufferUAV));
+	bufferUAV.FirstElement = 0;
+	bufferUAV.NumElements = BUFFERSIZE;
+	bufferUAV.Flags = D3D11_BUFFER_UAV_FLAG_COUNTER; //D3D11_BUFFER_UAV_FLAG_APPEND or D3D11_BUFFER_UAV_FLAG_COUNTER
+
+	ZeroMemory(&descUAV, sizeof(descUAV));
+	descUAV.Format = DXGI_FORMAT_UNKNOWN;
+	descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+	descUAV.Buffer = bufferUAV;
+	hr = g_pd3dDevice->CreateUnorderedAccessView(VFLcolors, &descUAV, &VFLcolors_UAV);
+	if (FAILED(hr))
+		return false;
+
 	// Initialize RW buffer and UAV for octree
 	ZeroMemory(&bufferDesc, sizeof(bufferDesc));
 	bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
@@ -1060,11 +1099,12 @@ HRESULT InitDevice()
 		return false;
 
 	D3D11_BUFFER_SRV bufferSRV;
+	D3D11_SHADER_RESOURCE_VIEW_DESC descSRV;
 	ZeroMemory(&bufferSRV, sizeof(bufferSRV));
 	bufferSRV.FirstElement = 0;
 	bufferSRV.NumElements = BUFFERSIZE;
 
-	D3D11_SHADER_RESOURCE_VIEW_DESC descSRV;
+	
 	ZeroMemory(&descSRV, sizeof(descSRV));
 	descSRV.Buffer = bufferSRV;
 	descSRV.Format = DXGI_FORMAT_UNKNOWN;
@@ -1075,7 +1115,7 @@ HRESULT InitDevice()
 
 	// Initialize RW buffer and UAV for count
 	ZeroMemory(&bufferDesc, sizeof(bufferDesc));
-	bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+	bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
 	bufferDesc.ByteWidth = sizeof(unsigned int) * 6;
 	bufferDesc.StructureByteStride = sizeof(unsigned int);
 	bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
@@ -1679,16 +1719,22 @@ void MakeClouds()
 
 //############################################################################################################
 
-void Render_to_3dtexture(long elapsed)
+void Render_to_octree(long elapsed)
 {
+
+
+	g_pImmediateContext->RSSetViewports(1, &viewport_octree);
+
+	
+
 	ID3D11RenderTargetView*			RenderTarget = RenderToTexture.GetRenderTarget();
-	ID3D11UnorderedAccessView *uav[3] = { NULL, NULL, NULL };
+	ID3D11UnorderedAccessView *uav[4] = { NULL, NULL, NULL, NULL };
 	
 	//uav[0] = Voxel_GI.GetUAV();
 	uav[0] = Octree_UAV;
 	uav[1] = VFL_UAV;
 	uav[2] = count_UAV;
-	//uav[3] = VFL_UAV; // NEW NEW NEW NEW
+	uav[3] = VFLcolors_UAV; // NEW NEW NEW NEW
 	
 	float ClearColorRT[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red, green, blue, alpha
 	//float ClearColorUAVfloat[1] = { 0.0f }; // one value
@@ -1802,7 +1848,7 @@ void Render_to_3dtexture(long elapsed)
 	
 	ID3D11RenderTargetView* RT;
 	RT = 0;
-	/*for(int i = 0; i < 3; i++)
+	for(int i = 0; i < 4; i++)
 		uav[i] = 0;
 	g_pImmediateContext->OMSetRenderTargetsAndUnorderedAccessViews(1, &RT, 0, 1, 3, uav, 0);	
 
@@ -1810,8 +1856,9 @@ void Render_to_3dtexture(long elapsed)
 	g_pImmediateContext->VSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
 	g_pImmediateContext->PSSetShaderResources(0, D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, srvs);
 
-	*/
+	
 	//debugCS();
+	g_pImmediateContext->RSSetViewports(1, &viewport_normal);
 
 }
 
@@ -1946,7 +1993,7 @@ void Reset_CS()
 	if(actualnum_srv)	g_pImmediateContext->CSSetShaderResources(0, actualnum_srv, ppSRVsNULL);
 	if(actualnum_buffs)	g_pImmediateContext->CSSetConstantBuffers(0, actualnum_buffs, ppBuffsNULL);
 
-	actualnum_buffs = actualnum_uav = actualnum_srv = 0;
+	//actualnum_buffs = actualnum_uav = actualnum_srv = 0;
 	g_pImmediateContext->CSSetShader(NULL, NULL, 0);
 	}
 //------------------------------------------------------- NEW NEW NEW
@@ -2034,14 +2081,15 @@ void run_compute_shader(long elapsed)
 
 	Reset_CS();
 
-	ID3D11UnorderedAccessView* uav[3] = { NULL, NULL, NULL };
-	unsigned int uavCounts[4] = {-1,-1,-1}; //has to be -1 for structured buffers
+	ID3D11UnorderedAccessView* uav[4] = { NULL, NULL, NULL, NULL };
+	unsigned int uavCounts[4] = {-1,-1,-1, -1}; //has to be -1 for structured buffers
 	
 	uav[0] = Octree_UAV;
 	uav[1] = VFL_UAV;
 	uav[2] = count_UAV;
+	uav[3] = VFLcolors_UAV;
 
-	g_pImmediateContext->CSSetUnorderedAccessViews(1, 3, uav, uavCounts);
+	g_pImmediateContext->CSSetUnorderedAccessViews(1, 4, uav, uavCounts);
 
 	
 	// reset shaders (if they are set)
@@ -2112,14 +2160,15 @@ void clear_uavs(long elapsed)
 
 	Reset_CS();
 
-	ID3D11UnorderedAccessView* uav[3] = { NULL, NULL, NULL };
-	unsigned int uavCounts[4] = { -1,-1,-1 }; //has to be -1 for structured buffers
+	ID3D11UnorderedAccessView* uav[4] = { NULL, NULL, NULL, NULL };
+	unsigned int uavCounts[4] = { -1,-1,-1, -1 }; //has to be -1 for structured buffers
 
 	uav[0] = Octree_UAV;
 	uav[1] = VFL_UAV;
 	uav[2] = count_UAV;
+	uav[3] = VFLcolors_UAV;
 
-	g_pImmediateContext->CSSetUnorderedAccessViews(1, 3, uav, uavCounts);
+	g_pImmediateContext->CSSetUnorderedAccessViews(1, 4, uav, uavCounts);
 
 
 	// reset shaders (if they are set)
@@ -2158,7 +2207,7 @@ void Render()
 	long el = stopwatch.elapse_micro();
 	
 	stopwatch.start(); //restart
-	Render_to_3dtexture(elapsed);
+	Render_to_octree(elapsed);
 	el = stopwatch.elapse_micro();
 	
 	
@@ -2172,6 +2221,9 @@ void Render()
 	//stopwatch.start(); //restart
 	Render_to_texture(elapsed);
 	elapsed = stopwatch.elapse_micro();
+
+	debugCS();
+	int iii = 0;
 
 	
 	Render_to_screen(elapsed);

@@ -18,6 +18,7 @@ Texture2D txBloom : register(t5);
 RWStructuredBuffer<uint> Octree_RW : register(u1);
 RWStructuredBuffer<float3> VFL : register(u2);
 RWStructuredBuffer<uint> count : register(u3);
+RWStructuredBuffer<float3> VFLcolors : register(u4);
 
 Texture3D Voxels_SR : register(t3);
 Texture1D<unsigned int> Octree_SR : register(t6);

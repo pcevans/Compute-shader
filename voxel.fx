@@ -12,7 +12,6 @@ SamplerState Sampler : register(s0);
 SamplerState SamplerNone : register(s1);
 
 Texture3D Voxel_SR : register(t0);
-//Texture1D<unsigned int> Octree_SR : register(t1);
 StructuredBuffer<uint> Octree_SR : register(t1);
 StructuredBuffer<uint> count : register(t2);
 
